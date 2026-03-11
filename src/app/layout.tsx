@@ -3,6 +3,7 @@ import './globals.css';
 import { MobileWrapper } from '@/components/MobileWrapper';
 import { BottomNav } from '@/components/BottomNav';
 import { AuthProvider } from '@/context/AuthContext';
+import { GlobalLoginModal } from '@/components/GlobalLoginModal';
 
 export const metadata: Metadata = {
   title: 'Reloxo - Short Video Discovery',
@@ -28,6 +29,7 @@ export default function RootLayout({
               {children}
             </main>
             <BottomNav />
+            <GlobalLoginModal />
           </MobileWrapper>
         </AuthProvider>
       </body>

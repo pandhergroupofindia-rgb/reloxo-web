@@ -1,9 +1,10 @@
-
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import YouTube, { YouTubeProps } from "react-youtube";
 import { Heart, MessageCircle, Forward, CircleUser } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { cn } from "@/lib/utils";
 
 const DUMMY_VIDEOS = [
   {
@@ -33,8 +34,10 @@ const DUMMY_VIDEOS = [
 ];
 
 export function VideoFeed() {
+  const { user, openLoginModal } = useAuth();
+  const [likedVideos, setLikedVideos] = useState<string[]>([]);
+
   const onPlayerReady: YouTubeProps["onReady"] = (event) => {
-    // Attempt to play on ready, though mobile browsers might block it without interaction
     event.target.playVideo();
   };
 
@@ -49,8 +52,24 @@ export function VideoFeed() {
       rel: 0,
       playsinline: 1,
       disablekb: 1,
-      mute: 1, // Autoplay usually requires mute
+      mute: 1,
     },
+  };
+
+  const handleInteraction = (videoId: string, type: 'like' | 'comment' | 'share' | 'profile') => {
+    if (!user) {
+      openLoginModal();
+      return;
+    }
+
+    if (type === 'like') {
+      setLikedVideos(prev => 
+        prev.includes(videoId) 
+          ? prev.filter(id => id !== videoId) 
+          : [...prev, videoId]
+      );
+    }
+    // Other interactions would be handled here
   };
 
   return (
@@ -67,7 +86,7 @@ export function VideoFeed() {
               opts={opts}
               onReady={onPlayerReady}
               className="w-full h-full"
-              containerClassName="w-full h-full scale-[1.5]" // Scale to help with filling the screen
+              containerClassName="w-full h-full scale-[1.5]"
             />
           </div>
 
@@ -86,28 +105,43 @@ export function VideoFeed() {
 
           {/* Bottom Right: Interaction Sidebar */}
           <div className="absolute bottom-6 right-4 flex flex-col items-center gap-6 z-10">
-            <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
+            <div 
+              onClick={() => handleInteraction(video.id, 'profile')}
+              className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
+            >
               <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
                 <CircleUser className="w-8 h-8 text-white" />
               </div>
               <span className="text-[10px] font-bold text-white">Profile</span>
             </div>
 
-            <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
+            <div 
+              onClick={() => handleInteraction(video.id, 'like')}
+              className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
+            >
               <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
-                <Heart className="w-8 h-8 text-white group-hover:text-primary transition-colors" />
+                <Heart className={cn(
+                  "w-8 h-8 transition-colors",
+                  likedVideos.includes(video.id) ? "text-primary fill-primary neon-text" : "text-white group-hover:text-primary"
+                )} />
               </div>
               <span className="text-[10px] font-bold text-white">{video.likes}</span>
             </div>
 
-            <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
+            <div 
+              onClick={() => handleInteraction(video.id, 'comment')}
+              className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
+            >
               <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
                 <MessageCircle className="w-8 h-8 text-white" />
               </div>
               <span className="text-[10px] font-bold text-white">{video.comments}</span>
             </div>
 
-            <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
+            <div 
+              onClick={() => handleInteraction(video.id, 'share')}
+              className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
+            >
               <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
                 <Forward className="w-8 h-8 text-white" />
               </div>

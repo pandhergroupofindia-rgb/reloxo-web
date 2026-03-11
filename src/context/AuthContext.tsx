@@ -26,8 +26,11 @@ interface AuthContextType {
   user: FirebaseUser | null;
   profile: UserProfile | null;
   loading: boolean;
+  isLoginModalOpen: boolean;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  openLoginModal: () => void;
+  closeLoginModal: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -55,6 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => unsubscribe();
   }, []);
+
+  const openLoginModal = () => setIsLoginModalOpen(true);
+  const closeLoginModal = () => setIsLoginModalOpen(false);
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
@@ -81,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setProfile(userDoc.data() as UserProfile);
       }
+      closeLoginModal();
     } catch (error) {
       console.error("Error signing in with Google", error);
     }
@@ -91,7 +99,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      profile, 
+      loading, 
+      isLoginModalOpen,
+      loginWithGoogle, 
+      logout,
+      openLoginModal,
+      closeLoginModal
+    }}>
       {children}
     </AuthContext.Provider>
   );
