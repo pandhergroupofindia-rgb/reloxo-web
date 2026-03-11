@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import YouTube, { YouTubeProps } from "react-youtube";
 import { Heart, MessageCircle, Forward, CircleUser } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -36,6 +37,11 @@ const DUMMY_VIDEOS = [
 export function VideoFeed() {
   const { user, openLoginModal } = useAuth();
   const [likedVideos, setLikedVideos] = useState<string[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const onPlayerReady: YouTubeProps["onReady"] = (event) => {
     event.target.playVideo();
@@ -69,8 +75,9 @@ export function VideoFeed() {
           : [...prev, videoId]
       );
     }
-    // Other interactions would be handled here
   };
+
+  if (!isMounted) return <div className="h-full w-full bg-black" />;
 
   return (
     <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar">
@@ -90,10 +97,10 @@ export function VideoFeed() {
             />
           </div>
 
-          {/* TikTok UI Overlay */}
+          {/* Overlay */}
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/60 pointer-events-none" />
 
-          {/* Bottom Left: Creator & Caption */}
+          {/* Creator & Caption */}
           <div className="absolute bottom-6 left-4 right-16 flex flex-col gap-2 z-10">
             <h3 className="font-headline font-bold text-white text-lg neon-text">
               {video.creator}
@@ -103,7 +110,7 @@ export function VideoFeed() {
             </p>
           </div>
 
-          {/* Bottom Right: Interaction Sidebar */}
+          {/* Sidebar */}
           <div className="absolute bottom-6 right-4 flex flex-col items-center gap-6 z-10">
             <div 
               onClick={() => handleInteraction(video.id, 'profile')}
