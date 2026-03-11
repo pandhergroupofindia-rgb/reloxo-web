@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { MobileWrapper } from '@/components/MobileWrapper';
@@ -22,7 +23,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased bg-black flex justify-center min-h-screen">
         <MobileWrapper>
-          <main className="flex-1 overflow-y-auto hide-scrollbar pb-20">
+          <main className="flex-1 overflow-hidden pb-20">
             {children}
           </main>
           <BottomNav />
