@@ -1,0 +1,28 @@
+{
+  "placeholderImages": [
+    {
+      "id": "video-1",
+      "description": "Neon dance performance",
+      "imageUrl": "https://picsum.photos/seed/dance/480/854",
+      "imageHint": "neon dance"
+    },
+    {
+      "id": "video-2",
+      "description": "Cyberpunk city drone footage",
+      "imageUrl": "https://picsum.photos/seed/cyber/480/854",
+      "imageHint": "cyberpunk city"
+    },
+    {
+      "id": "video-3",
+      "description": "Synthwave music visualizer",
+      "imageUrl": "https://picsum.photos/seed/synth/480/854",
+      "imageHint": "synthwave neon"
+    },
+    {
+      "id": "profile-1",
+      "description": "User avatar",
+      "imageUrl": "https://picsum.photos/seed/user1/200/200",
+      "imageHint": "avatar person"
+    }
+  ]
+}

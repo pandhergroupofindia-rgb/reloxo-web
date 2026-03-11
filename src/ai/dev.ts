@@ -1,1 +1,5 @@
-// Flows will be imported for their side effects in this file.
+import { config } from 'dotenv';
+config();
+
+import '@/ai/flows/auto-tag-and-summarize-video.ts';
+import '@/ai/flows/personalized-for-you-feed.ts';
