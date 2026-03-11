@@ -3,8 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   onAuthStateChanged, 
-  signInWithRedirect, 
-  getRedirectResult,
+  signInWithPopup, 
   GoogleAuthProvider, 
   signOut,
   User as FirebaseUser
@@ -43,65 +42,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-
-    const handleAuth = async () => {
-      try {
-        // 1. Check for redirect result first
-        const result = await getRedirectResult(auth);
-        if (result?.user && mounted) {
-          const loggedUser = result.user;
-          const userDocRef = doc(db, 'users', loggedUser.uid);
-          const userDoc = await getDoc(userDocRef);
-          
-          if (!userDoc.exists()) {
-            const newProfile: UserProfile = {
-              uid: loggedUser.uid,
-              email: loggedUser.email,
-              displayName: loggedUser.displayName,
-              photoURL: loggedUser.photoURL,
-              username: `@user_${loggedUser.uid.substring(0, 4)}`.toLowerCase(),
-              walletBalance: 0,
-              isVerified: false,
-              role: 'user',
-            };
-            await setDoc(userDocRef, newProfile);
-            setProfile(newProfile);
-          } else {
-            setProfile(userDoc.data() as UserProfile);
-          }
+    // Listen for auth state changes to keep the session alive and sync profile
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setProfile(userDoc.data() as UserProfile);
         }
-      } catch (error) {
-        console.error("Error handling redirect result:", error);
+      } else {
+        setProfile(null);
       }
+      setLoading(false);
+    });
 
-      // 2. Setup standard auth state listener
-      const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-        if (!mounted) return;
-        
-        setUser(currentUser);
-        if (currentUser) {
-          const userDocRef = doc(db, 'users', currentUser.uid);
-          const userDoc = await getDoc(userDocRef);
-          
-          if (userDoc.exists()) {
-            setProfile(userDoc.data() as UserProfile);
-          }
-        } else {
-          setProfile(null);
-        }
-        setLoading(false);
-      });
-
-      return unsubscribe;
-    };
-
-    const authInitPromise = handleAuth();
-
-    return () => {
-      mounted = false;
-      authInitPromise.then(unsub => unsub?.());
-    };
+    return () => unsubscribe();
   }, []);
 
   const openLoginModal = () => setIsLoginModalOpen(true);
@@ -110,10 +66,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      // Use redirect instead of popup for mobile compatibility
-      await signInWithRedirect(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const loggedUser = result.user;
+      
+      const userDocRef = doc(db, 'users', loggedUser.uid);
+      const docSnap = await getDoc(userDocRef);
+
+      if (!docSnap.exists()) {
+        // Strictly create a new document if it doesn't exist
+        const newProfile: UserProfile = {
+          uid: loggedUser.uid,
+          email: loggedUser.email,
+          displayName: loggedUser.displayName,
+          photoURL: loggedUser.photoURL,
+          username: `@user_${loggedUser.uid.substring(0, 5)}`.toLowerCase(),
+          walletBalance: 0,
+          isVerified: false,
+          role: 'user',
+        };
+        await setDoc(userDocRef, newProfile);
+        setProfile(newProfile);
+        console.log("New user created in Firestore");
+      } else {
+        setProfile(docSnap.data() as UserProfile);
+        console.log("Existing user logged in");
+      }
+      
+      closeLoginModal();
     } catch (error) {
-      console.error("Error initiating Google Redirect", error);
+      console.error("Error signing in with Google:", error);
     }
   };
 
