@@ -11,12 +11,13 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
-interface UserProfile {
+export interface UserProfile {
   uid: string;
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
   username: string;
+  bio: string;
   walletBalance: number;
   isVerified: boolean;
   role: string;
@@ -27,10 +28,14 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   isLoginModalOpen: boolean;
+  isOnboardingOpen: boolean;
+  pendingUser: FirebaseUser | null;
   loginWithGoogle: () => Promise<void>;
+  completeOnboarding: (username: string, bio: string) => Promise<void>;
   logout: () => Promise<void>;
   openLoginModal: () => void;
   closeLoginModal: () => void;
+  closeOnboarding: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,9 +45,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [pendingUser, setPendingUser] = useState<FirebaseUser | null>(null);
 
   useEffect(() => {
-    // Listen for auth state changes to keep the session alive and sync profile
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -62,6 +68,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const openLoginModal = () => setIsLoginModalOpen(true);
   const closeLoginModal = () => setIsLoginModalOpen(false);
+  const closeOnboarding = () => {
+    setIsOnboardingOpen(false);
+    setPendingUser(null);
+  };
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
@@ -72,29 +82,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDocRef = doc(db, 'users', loggedUser.uid);
       const docSnap = await getDoc(userDocRef);
 
-      if (!docSnap.exists()) {
-        // Strictly create a new document if it doesn't exist
-        const newProfile: UserProfile = {
-          uid: loggedUser.uid,
-          email: loggedUser.email,
-          displayName: loggedUser.displayName,
-          photoURL: loggedUser.photoURL,
-          username: `@user_${loggedUser.uid.substring(0, 5)}`.toLowerCase(),
-          walletBalance: 0,
-          isVerified: false,
-          role: 'user',
-        };
-        await setDoc(userDocRef, newProfile);
-        setProfile(newProfile);
-        console.log("New user created in Firestore");
-      } else {
+      if (docSnap.exists()) {
+        // Old user - just login
         setProfile(docSnap.data() as UserProfile);
         console.log("Existing user logged in");
+        closeLoginModal();
+      } else {
+        // New user - trigger onboarding
+        console.log("New user detected, opening onboarding");
+        setPendingUser(loggedUser);
+        closeLoginModal();
+        setIsOnboardingOpen(true);
       }
-      
-      closeLoginModal();
     } catch (error) {
       console.error("Error signing in with Google:", error);
+    }
+  };
+
+  const completeOnboarding = async (username: string, bio: string) => {
+    if (!pendingUser) return;
+
+    const newProfile: UserProfile = {
+      uid: pendingUser.uid,
+      email: pendingUser.email,
+      displayName: pendingUser.displayName,
+      photoURL: pendingUser.photoURL,
+      username: username.startsWith('@') ? username : `@${username}`,
+      bio: bio,
+      walletBalance: 0,
+      isVerified: false,
+      role: 'user',
+    };
+
+    try {
+      await setDoc(doc(db, 'users', pendingUser.uid), newProfile);
+      setProfile(newProfile);
+      console.log("New user profile created in Firestore");
+    } catch (error) {
+      console.error("Error creating user profile:", error);
+      throw error;
     }
   };
 
@@ -108,10 +134,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile, 
       loading, 
       isLoginModalOpen,
+      isOnboardingOpen,
+      pendingUser,
       loginWithGoogle, 
+      completeOnboarding,
       logout,
       openLoginModal,
-      closeLoginModal
+      closeLoginModal,
+      closeOnboarding
     }}>
       {children}
     </AuthContext.Provider>
