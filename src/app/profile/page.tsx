@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useAuth } from '@/context/AuthContext';
@@ -8,9 +7,9 @@ import { Settings, Grid, Heart, Bookmark } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function ProfilePage() {
-  const { profile, logout } = useAuth();
+  const { user } = useAuth();
 
-  if (!profile) {
+  if (!user) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 text-center">
         <h2 className="text-xl font-headline font-bold mb-4">Profile not found</h2>
@@ -25,10 +24,10 @@ export default function ProfilePage() {
       <div className="p-4 flex flex-col items-center gap-4 border-b border-white/5 pt-8">
         <div className="relative">
           <Avatar className="w-24 h-24 border-2 border-primary neon-border">
-            <AvatarImage src={profile.photoURL || ''} alt={profile.displayName || ''} />
-            <AvatarFallback className="bg-muted text-xl">{profile.displayName?.charAt(0)}</AvatarFallback>
+            <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
+            <AvatarFallback className="bg-muted text-xl">{user.displayName?.charAt(0)}</AvatarFallback>
           </Avatar>
-          {profile.isVerified && (
+          {user.isVerified && (
             <div className="absolute bottom-0 right-0 bg-primary text-black rounded-full p-1 border-2 border-black">
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
             </div>
@@ -36,8 +35,8 @@ export default function ProfilePage() {
         </div>
         
         <div className="text-center">
-          <h1 className="text-xl font-headline font-bold neon-text">{profile.displayName}</h1>
-          <p className="text-primary text-sm font-medium">{profile.username}</p>
+          <h1 className="text-xl font-headline font-bold neon-text">{user.displayName}</h1>
+          <p className="text-primary text-sm font-medium">{user.username}</p>
         </div>
 
         <div className="flex gap-8 py-2">
@@ -59,7 +58,7 @@ export default function ProfilePage() {
           <Button variant="outline" className="flex-1 border-white/10 hover:bg-white/5">
             Edit Profile
           </Button>
-          <Button variant="outline" size="icon" className="border-white/10" onClick={logout}>
+          <Button variant="outline" size="icon" className="border-white/10">
             <Settings className="w-4 h-4" />
           </Button>
         </div>

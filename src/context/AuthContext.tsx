@@ -1,157 +1,116 @@
-'use client';
-
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { 
-  onAuthStateChanged, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signOut,
-  User as FirebaseUser
-} from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
-
-export interface UserProfile {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-  username: string;
-  bio: string;
-  walletBalance: number;
-  isVerified: boolean;
-  role: string;
-}
+"use client";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { auth, db } from "../lib/firebase";
+import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 interface AuthContextType {
-  user: FirebaseUser | null;
-  profile: UserProfile | null;
+  user: any;
   loading: boolean;
   isLoginModalOpen: boolean;
-  isOnboardingOpen: boolean;
-  pendingUser: FirebaseUser | null;
-  loginWithGoogle: () => Promise<void>;
-  completeOnboarding: (username: string, bio: string) => Promise<void>;
-  logout: () => Promise<void>;
   openLoginModal: () => void;
   closeLoginModal: () => void;
-  closeOnboarding: () => void;
+  isOnboardingOpen: boolean;
+  tempUser: FirebaseUser | null;
+  completeOnboarding: (username: string, bio: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Modals State
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
-  const [pendingUser, setPendingUser] = useState<FirebaseUser | null>(null);
+  const [tempUser, setTempUser] = useState<FirebaseUser | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
       if (currentUser) {
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          setProfile(userDoc.data() as UserProfile);
+        try {
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          if (userDoc.exists()) {
+            setUser({ ...currentUser, ...userDoc.data() });
+          } else {
+            setTempUser(currentUser);
+            setIsOnboardingOpen(true);
+          }
+        } catch (error: any) {
+          alert("Database Error: " + error.message);
         }
       } else {
-        setProfile(null);
+        setUser(null);
       }
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
-
-  const openLoginModal = () => setIsLoginModalOpen(true);
-  const closeLoginModal = () => setIsLoginModalOpen(false);
-  const closeOnboarding = () => {
-    setIsOnboardingOpen(false);
-    setPendingUser(null);
-  };
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      const loggedUser = result.user;
-      
-      const userDocRef = doc(db, 'users', loggedUser.uid);
-      const docSnap = await getDoc(userDocRef);
+      const loggedInUser = result.user;
+
+      const docRef = doc(db, "users", loggedInUser.uid);
+      const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        // Old user - just login
-        setProfile(docSnap.data() as UserProfile);
-        console.log("Existing user logged in");
-        closeLoginModal();
+        setUser({ ...loggedInUser, ...docSnap.data() });
+        setIsLoginModalOpen(false);
+        alert("Welcome back to Reloxo! 🔥");
       } else {
-        // New user - trigger onboarding
-        console.log("New user detected, opening onboarding");
-        setPendingUser(loggedUser);
-        closeLoginModal();
+        setTempUser(loggedInUser);
+        setIsLoginModalOpen(false);
         setIsOnboardingOpen(true);
       }
-    } catch (error) {
-      console.error("Error signing in with Google:", error);
+    } catch (error: any) {
+      alert("Login Error: " + error.message);
     }
   };
 
   const completeOnboarding = async (username: string, bio: string) => {
-    if (!pendingUser) return;
-
-    const newProfile: UserProfile = {
-      uid: pendingUser.uid,
-      email: pendingUser.email,
-      displayName: pendingUser.displayName,
-      photoURL: pendingUser.photoURL,
-      username: username.startsWith('@') ? username : `@${username}`,
-      bio: bio,
-      walletBalance: 0,
-      isVerified: false,
-      role: 'user',
-    };
-
+    if (!tempUser) return;
     try {
-      await setDoc(doc(db, 'users', pendingUser.uid), newProfile);
-      setProfile(newProfile);
-      console.log("New user profile created in Firestore");
-    } catch (error) {
-      console.error("Error creating user profile:", error);
-      throw error;
+      const userData = {
+        uid: tempUser.uid,
+        email: tempUser.email,
+        displayName: tempUser.displayName,
+        photoURL: tempUser.photoURL,
+        username: username || `@user_${tempUser.uid.substring(0,5)}`,
+        bio: bio || "",
+        walletBalance: 0,
+        isVerified: false,
+        role: "user"
+      };
+      await setDoc(doc(db, "users", tempUser.uid), userData);
+      setUser({ ...tempUser, ...userData });
+      setIsOnboardingOpen(false);
+      setTempUser(null);
+      alert("Profile Created Successfully! 🎉");
+    } catch (error: any) {
+      alert("Profile Save Error: " + error.message);
     }
   };
 
-  const logout = async () => {
-    await signOut(auth);
-  };
-
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      profile, 
-      loading, 
-      isLoginModalOpen,
-      isOnboardingOpen,
-      pendingUser,
-      loginWithGoogle, 
-      completeOnboarding,
-      logout,
-      openLoginModal,
-      closeLoginModal,
-      closeOnboarding
+    <AuthContext.Provider value={{
+      user, loading,
+      isLoginModalOpen, openLoginModal: () => setIsLoginModalOpen(true), closeLoginModal: () => setIsLoginModalOpen(false),
+      isOnboardingOpen, tempUser, completeOnboarding, loginWithGoogle
     }}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
