@@ -16,8 +16,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   if (!isOpen) return null;
 
   const handleLogin = async () => {
-    await loginWithGoogle();
-    onClose();
+    try {
+      await loginWithGoogle();
+      // Appwrite usually handles redirect, but we can call onClose if needed for local state
+    } catch (error) {
+      console.error('Login failed:', error);
+    }
   };
 
   return (
@@ -41,7 +45,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               Join Reloxo 🚀
             </h2>
             <p className="text-muted-foreground text-sm">
-              Discover, interact, and support creators.
+              Join Reloxo to interact! Discover, interact, and support creators.
             </p>
           </div>
           <button 

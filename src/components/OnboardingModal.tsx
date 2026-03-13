@@ -1,29 +1,18 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Sparkles, Loader2 } from 'lucide-react';
 
 export function OnboardingModal() {
   const { isOnboardingOpen, tempUser, completeOnboarding } = useAuth();
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (tempUser?.displayName) {
-      const suggested = tempUser.displayName
-        .toLowerCase()
-        .replace(/\s+/g, '_')
-        .replace(/[^a-z0-9_]/g, '');
-      setUsername(`@${suggested}`);
-    }
-  }, [tempUser]);
 
   if (!isOnboardingOpen || !tempUser) return null;
 
@@ -33,16 +22,16 @@ export function OnboardingModal() {
     try {
       await completeOnboarding(username, bio);
     } catch (error) {
-      console.error(error);
+      console.error('Onboarding failed:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[110] bg-black flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-[#050505] border border-primary/30 rounded-[2.5rem] p-8 relative overflow-hidden shadow-[0_0_50px_rgba(6,182,212,0.15)] animate-in fade-in zoom-in duration-300">
-        {/* Background Glow */}
+        {/* Background Glows */}
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 blur-[80px] rounded-full" />
         <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-secondary/20 blur-[80px] rounded-full" />
 
@@ -50,20 +39,19 @@ export function OnboardingModal() {
           <div className="text-center space-y-2">
             <div className="flex justify-center mb-4">
               <div className="relative">
-                <Avatar className="w-24 h-24 border-2 border-primary neon-border">
-                  <AvatarImage src={tempUser.photoURL || ''} />
-                  <AvatarFallback className="text-2xl">{tempUser.displayName?.charAt(0)}</AvatarFallback>
-                </Avatar>
+                <div className="w-24 h-24 border-2 border-primary neon-border rounded-full flex items-center justify-center bg-muted overflow-hidden">
+                   {tempUser?.name?.charAt(0) || 'U'}
+                </div>
                 <div className="absolute -bottom-1 -right-1 bg-secondary text-black rounded-full p-1.5 shadow-lg">
                   <Sparkles className="w-4 h-4" />
                 </div>
               </div>
             </div>
             <h2 className="text-2xl font-headline font-bold text-white neon-text">
-              Setup your profile
+              Welcome, {tempUser.name}! 🚀
             </h2>
             <p className="text-muted-foreground text-sm">
-              How should the community know you?
+              Let's set up your profile to join the Reloxo community.
             </p>
           </div>
 
@@ -95,10 +83,17 @@ export function OnboardingModal() {
             disabled={isSubmitting}
             className={cn(
               "w-full h-14 rounded-2xl text-lg font-bold transition-all active:scale-[0.98] neon-border",
-              isSubmitting ? "opacity-50" : "bg-primary text-black hover:bg-primary/90"
+              isSubmitting ? "opacity-70 cursor-not-allowed" : "bg-primary text-black hover:bg-primary/90"
             )}
           >
-            {isSubmitting ? "Creating..." : "Complete Profile"}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Creating Profile...
+              </>
+            ) : (
+              "Complete Profile"
+            )}
           </Button>
         </form>
       </div>
