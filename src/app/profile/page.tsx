@@ -3,16 +3,24 @@
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Settings, Grid, Heart, Bookmark } from 'lucide-react';
+import { Settings, Grid, Heart, Bookmark, LogOut } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, logout, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full bg-black">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!user) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-        <h2 className="text-xl font-headline font-bold mb-4">Profile not found</h2>
+      <div className="flex flex-col items-center justify-center h-full p-4 text-center bg-black">
+        <h2 className="text-xl font-headline font-bold mb-4 text-white">Profile not found</h2>
         <p className="text-muted-foreground mb-6">Please sign in to view your profile.</p>
       </div>
     );
@@ -24,19 +32,14 @@ export default function ProfilePage() {
       <div className="p-4 flex flex-col items-center gap-4 border-b border-white/5 pt-8">
         <div className="relative">
           <Avatar className="w-24 h-24 border-2 border-primary neon-border">
-            <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
-            <AvatarFallback className="bg-muted text-xl">{user.displayName?.charAt(0)}</AvatarFallback>
+            <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || user.displayName || 'U')}&background=33F0FF&color=000`} alt={user.name} />
+            <AvatarFallback className="bg-muted text-xl">{user.name?.charAt(0) || 'U'}</AvatarFallback>
           </Avatar>
-          {user.isVerified && (
-            <div className="absolute bottom-0 right-0 bg-primary text-black rounded-full p-1 border-2 border-black">
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-            </div>
-          )}
         </div>
         
         <div className="text-center">
-          <h1 className="text-xl font-headline font-bold neon-text">{user.displayName}</h1>
-          <p className="text-primary text-sm font-medium">{user.username}</p>
+          <h1 className="text-xl font-headline font-bold neon-text">{user.name || user.displayName}</h1>
+          <p className="text-primary text-sm font-medium">{user.username || '@user'}</p>
         </div>
 
         <div className="flex gap-8 py-2">
@@ -58,13 +61,12 @@ export default function ProfilePage() {
           <Button variant="outline" className="flex-1 border-white/10 hover:bg-white/5">
             Edit Profile
           </Button>
-          <Button variant="outline" size="icon" className="border-white/10">
-            <Settings className="w-4 h-4" />
+          <Button variant="outline" size="icon" className="border-white/10" onClick={logout}>
+            <LogOut className="w-4 h-4 text-destructive" />
           </Button>
         </div>
       </div>
 
-      {/* Tabs */}
       <Tabs defaultValue="videos" className="w-full">
         <TabsList className="w-full bg-transparent border-b border-white/5 rounded-none p-0 h-12">
           <TabsTrigger value="videos" className="flex-1 rounded-none data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary">
@@ -78,9 +80,9 @@ export default function ProfilePage() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="videos" className="p-1 grid grid-cols-3 gap-1">
-          <div className="aspect-[3/4] bg-muted animate-pulse rounded-sm" />
-          <div className="aspect-[3/4] bg-muted animate-pulse rounded-sm" />
-          <div className="aspect-[3/4] bg-muted animate-pulse rounded-sm" />
+          <div className="aspect-[3/4] bg-muted/20 rounded-sm" />
+          <div className="aspect-[3/4] bg-muted/20 rounded-sm" />
+          <div className="aspect-[3/4] bg-muted/20 rounded-sm" />
         </TabsContent>
         <TabsContent value="liked" className="p-4 text-center text-muted-foreground text-sm">
           No liked videos yet
