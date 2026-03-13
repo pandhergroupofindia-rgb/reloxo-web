@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { X, Upload, Film, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, Upload, Film, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,16 +18,31 @@ const VIDEOS_COLLECTION_ID = 'videos';
 
 export function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const { user } = useAuth();
+  const [title, setTitle] = useState('');
   const [caption, setCaption] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setFile(null);
+      setTitle('');
+      setCaption('');
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
+      const url = URL.createObjectURL(selectedFile);
+      setPreviewUrl(url);
     }
   };
 
@@ -49,7 +64,7 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
       // 2. Prepare YouTube Metadata
       const metadata = {
         snippet: {
-          title: `Reloxo Vibe - ${new Date().toLocaleDateString()}`,
+          title: title || `Reloxo Vibe - ${new Date().toLocaleDateString()}`,
           description: caption,
           categoryId: '22', // People & Blogs
         },
@@ -109,6 +124,7 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
         ID.unique(),
         {
           youtubeId: videoId,
+          title: title,
           caption: caption,
           uploaderUid: user?.$id || user?.uid,
           likesCount: 0,
@@ -126,83 +142,127 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/90 backdrop-blur-md"
+        className="absolute inset-0 bg-black/95 backdrop-blur-sm"
         onClick={!isUploading ? onClose : undefined}
       />
       
-      <div className="relative w-full max-w-md bg-[#0a0a0a] border border-primary/30 rounded-[2.5rem] p-8 shadow-[0_0_50px_rgba(6,182,212,0.15)] animate-in fade-in zoom-in duration-300">
-        <button 
-          onClick={onClose}
-          disabled={isUploading}
-          className="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 disabled:opacity-0"
-        >
-          <X className="w-5 h-5 text-white" />
-        </button>
-
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-headline font-bold text-white neon-text">
-            Drop Your Vibe ⚡
-          </h2>
-          <p className="text-muted-foreground text-sm mt-2">
-            Share your story with the Reloxo community.
-          </p>
-        </div>
-
-        <div className="space-y-6">
-          <div 
-            onClick={() => !isUploading && fileInputRef.current?.click()}
-            className="aspect-[16/9] rounded-2xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary/50 transition-colors group"
+      {/* Modal Container */}
+      <div className="relative w-full h-full sm:h-auto sm:max-w-xl bg-black sm:border sm:border-white/10 sm:rounded-[2.5rem] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+        
+        {/* Header */}
+        <header className="p-4 flex items-center justify-between border-b border-white/5">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onClose}
+            disabled={isUploading}
+            className="text-white hover:bg-white/5"
           >
-            <input 
-              type="file" 
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="video/*"
-              className="hidden"
-            />
-            {file ? (
-              <div className="text-center p-4">
-                <Film className="w-10 h-10 text-primary mx-auto mb-2" />
-                <p className="text-xs text-white font-medium truncate max-w-[200px]">
-                  {file.name}
-                </p>
-              </div>
-            ) : (
-              <>
-                <Upload className="w-10 h-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                <p className="text-sm text-muted-foreground">Select Video File</p>
-              </>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-primary px-1">Caption</label>
-            <Textarea 
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="What's the energy today? #trending #reloxo"
-              className="bg-white/5 border-white/10 rounded-xl min-h-[100px] focus-visible:ring-primary focus-visible:border-primary resize-none text-white"
-              disabled={isUploading}
-            />
-          </div>
-
+            <X className="w-6 h-6" />
+          </Button>
+          <h2 className="text-lg font-headline font-bold neon-text">New Vibe</h2>
           <Button 
             onClick={handleUpload}
             disabled={isUploading || !file}
-            className="w-full h-14 rounded-2xl text-lg font-bold bg-primary text-black hover:bg-primary/90 transition-all active:scale-[0.98] neon-border disabled:opacity-50"
+            className="bg-primary text-black font-bold hover:bg-primary/90 px-6 rounded-full"
           >
-            {isUploading ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Uploading... Please wait</span>
-              </div>
-            ) : (
-              "Post Vibe"
-            )}
+            Post
           </Button>
+        </header>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-6 hide-scrollbar pb-24">
+          
+          {/* Video Preview / Selector */}
+          <div className="flex gap-4">
+            <div 
+              onClick={() => !isUploading && fileInputRef.current?.click()}
+              className="relative w-32 aspect-[9/16] bg-white/5 rounded-xl border border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-colors group overflow-hidden"
+            >
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="video/*"
+                className="hidden"
+              />
+              {previewUrl ? (
+                <video 
+                  src={previewUrl}
+                  className="w-full h-full object-cover"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                />
+              ) : (
+                <>
+                  <Upload className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors mb-2" />
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold text-center px-2">Choose File</span>
+                </>
+              )}
+              {previewUrl && !isUploading && (
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <Film className="w-6 h-6 text-white" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase tracking-widest font-bold text-primary flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" />
+                  Video Title
+                </label>
+                <Input 
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Catchy title..."
+                  className="bg-white/5 border-white/10 rounded-xl focus-visible:ring-primary focus-visible:border-primary text-white"
+                  disabled={isUploading}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase tracking-widest font-bold text-primary">Caption & Hashtags</label>
+                <Textarea 
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="What's the energy? #trending #reloxo"
+                  className="bg-white/5 border-white/10 rounded-xl min-h-[120px] focus-visible:ring-primary focus-visible:border-primary resize-none text-white"
+                  disabled={isUploading}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Guidelines */}
+          <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl">
+            <h3 className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Pro Tips</h3>
+            <ul className="text-xs text-muted-foreground space-y-2">
+              <li className="flex items-start gap-2">• Keep videos under 60 seconds for maximum reach.</li>
+              <li className="flex items-start gap-2">• Vertical (9:16) aspect ratio is required.</li>
+              <li className="flex items-start gap-2">• Add relevant hashtags to get discovered.</li>
+            </ul>
+          </div>
         </div>
+
+        {/* Uploading Overlay */}
+        {isUploading && (
+          <div className="absolute inset-0 z-[110] bg-black/80 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
+            <div className="relative mb-8">
+              <div className="w-24 h-24 border-4 border-primary/20 rounded-full animate-spin border-t-primary" />
+              <Film className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 text-primary" />
+            </div>
+            <h3 className="text-2xl font-headline font-bold text-white mb-2 neon-text">Publishing your Vibe... 🚀</h3>
+            <p className="text-muted-foreground text-sm max-w-xs">
+              Hang tight! We're processing your masterpiece and getting it ready for the Reloxo stage.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
