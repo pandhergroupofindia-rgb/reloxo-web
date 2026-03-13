@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Home, Compass, Plus, Inbox, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -16,7 +16,6 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const { user, openLoginModal } = useAuth();
 
   const handleNavClick = (e: React.MouseEvent, item: typeof navItems[0]) => {
@@ -27,7 +26,7 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-3 flex items-center justify-between z-50">
+    <nav className="absolute bottom-0 left-0 w-full bg-black/80 backdrop-blur-lg border-t border-white/10 px-6 py-3 flex items-center justify-between z-50">
       {navItems.map((item) => {
         const isActive = pathname === item.href;
         const Icon = item.icon;

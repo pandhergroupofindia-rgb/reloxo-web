@@ -1,6 +1,5 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { MobileWrapper } from '@/components/MobileWrapper';
 import { BottomNav } from '@/components/BottomNav';
 import { AuthProvider } from '@/context/AuthContext';
 import { GlobalLoginModal } from '@/components/GlobalLoginModal';
@@ -10,6 +9,13 @@ import { Toaster } from '@/components/ui/toaster';
 export const metadata: Metadata = {
   title: 'Reloxo - Short Video Discovery',
   description: 'A futuristic dark neon short video experience.',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -24,16 +30,16 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className="font-body antialiased bg-black flex justify-center min-h-screen">
+      <body className="font-body antialiased bg-[#050505] min-h-screen">
         <AuthProvider>
-          <MobileWrapper>
-            <main className="flex-1 overflow-hidden pb-20">
+          <div className="max-w-[430px] mx-auto h-[100dvh] relative bg-black text-white overflow-hidden sm:border-x sm:border-white/10 shadow-2xl flex flex-col">
+            <main className="flex-1 overflow-hidden">
               {children}
             </main>
             <BottomNav />
             <GlobalLoginModal />
             <OnboardingModal />
-          </MobileWrapper>
+          </div>
           <Toaster />
         </AuthProvider>
       </body>
