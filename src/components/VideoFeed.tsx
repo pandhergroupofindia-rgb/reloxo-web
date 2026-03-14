@@ -32,6 +32,8 @@ export function VideoFeed() {
   
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [showInteractionIcon, setShowInteractionIcon] = useState<'play' | 'pause' | 'like' | null>(null);
+  const [likingVideos, setLikingVideos] = useState<Set<string>>(new Set());
+  
   const playerRefs = useRef<Record<string, any>>({});
   const lastTap = useRef<number>(0);
   const feedRef = useRef<HTMLDivElement>(null);
@@ -48,7 +50,6 @@ export function VideoFeed() {
     }
   }, [user, feed]);
 
-  // Handle intersection for playback control
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -56,13 +57,11 @@ export function VideoFeed() {
           if (entry.isIntersecting) {
             const videoId = entry.target.getAttribute('data-video-id');
             setActiveVideoId(videoId);
-            // Play this video
             if (videoId && playerRefs.current[videoId]) {
               playerRefs.current[videoId].playVideo();
             }
           } else {
             const videoId = entry.target.getAttribute('data-video-id');
-            // Pause others
             if (videoId && playerRefs.current[videoId]) {
               playerRefs.current[videoId].pauseVideo();
             }
@@ -96,7 +95,6 @@ export function VideoFeed() {
       });
       
       setFeed(processedFeed);
-      
       const uploaderIds = Array.from(new Set(response.documents.map((v: any) => v.uploaderUid)));
       uploaderIds.forEach(id => fetchUserProfile(id));
       
@@ -148,18 +146,16 @@ export function VideoFeed() {
     const DOUBLE_TAP_DELAY = 300;
     
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
-      // Double Tap (Like)
       if (!likedVideos.includes(video.$id)) {
         await handleLike(video.$id, video.likesCount || 0);
       }
       setShowInteractionIcon('like');
       setTimeout(() => setShowInteractionIcon(null), 800);
     } else {
-      // Single Tap (Play/Pause)
       const player = playerRefs.current[videoId];
       if (player) {
         const state = player.getPlayerState();
-        if (state === 1) { // playing
+        if (state === 1) {
           player.pauseVideo();
           setShowInteractionIcon('pause');
         } else {
@@ -174,7 +170,6 @@ export function VideoFeed() {
 
   const onPlayerReady = (event: any, id: string) => {
     playerRefs.current[id] = event.target;
-    // If it's the active one, play it
     if (id === activeVideoId) {
       event.target.playVideo();
     } else {
@@ -188,11 +183,15 @@ export function VideoFeed() {
       return;
     }
 
+    if (likingVideos.has(videoId)) return;
+
     const userId = user.$id || user.uid;
     const isLiked = likedVideos.includes(videoId);
-
-    // Optimistic UI
     const nextLikesCount = isLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1;
+
+    setLikingVideos(prev => new Set(prev).add(videoId));
+    
+    // Optimistic UI
     setLikedVideos(prev => isLiked ? prev.filter(id => id !== videoId) : [...prev, videoId]);
     setFeed(prev => prev.map(v => v.$id === videoId ? { ...v, likesCount: nextLikesCount } : v));
 
@@ -207,25 +206,27 @@ export function VideoFeed() {
         if (existingLikes.total > 0) {
           await databases.deleteDocument(DATABASE_ID, LIKES_COLLECTION_ID, existingLikes.documents[0].$id);
         }
-
-        await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId, {
-          likesCount: nextLikesCount
-        });
       } else {
         await databases.createDocument(DATABASE_ID, LIKES_COLLECTION_ID, ID.unique(), {
           userId: userId,
           videoId: videoId
         });
-
-        await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId, {
-          likesCount: nextLikesCount
-        });
       }
+
+      await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId, {
+        likesCount: nextLikesCount
+      });
     } catch (error) {
       console.error('Like error:', error);
       // Revert on error
       setLikedVideos(prev => isLiked ? [...prev, videoId] : prev.filter(id => id !== videoId));
       setFeed(prev => prev.map(v => v.$id === videoId ? { ...v, likesCount: currentLikes } : v));
+    } finally {
+      setLikingVideos(prev => {
+        const next = new Set(prev);
+        next.delete(videoId);
+        return next;
+      });
     }
   };
 
@@ -313,7 +314,6 @@ export function VideoFeed() {
 
   return (
     <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar relative" ref={feedRef}>
-      {/* Top Navigation */}
       <div className="fixed top-0 left-0 w-full z-[100] p-4 flex items-center justify-between bg-black/80 backdrop-blur-md border-b border-white/5 shadow-lg">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-headline font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
@@ -337,7 +337,7 @@ export function VideoFeed() {
                   <AlertTriangle className="w-8 h-8 text-white/20" />
                 </div>
                 <h3 className="text-white/40 font-bold uppercase tracking-widest text-xs">Advertisement Placeholder</h3>
-                <p className="text-white/20 text-[10px] max-w-[200px]">Monetization services (Monetag/AdSense) will be integrated here.</p>
+                <p className="text-white/20 text-[10px] max-w-[200px]">Monetization services will be integrated here.</p>
               </div>
             </section>
           );
@@ -367,10 +367,7 @@ export function VideoFeed() {
               />
             </div>
 
-            <div 
-              className="absolute inset-0 z-10 cursor-pointer"
-              onClick={() => handleInteraction(item.$id, item)}
-            />
+            <div className="absolute inset-0 z-10 cursor-pointer" onClick={() => handleInteraction(item.$id, item)} />
 
             {showInteractionIcon && (
               <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none animate-in zoom-in fade-in duration-300">
@@ -385,44 +382,30 @@ export function VideoFeed() {
             <div className="absolute bottom-24 left-4 right-20 flex flex-col gap-3 z-30 animate-in slide-in-from-left-4 duration-500 pointer-events-none">
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <Link 
-                    href={`/profile?id=${item.uploaderUid}`}
-                    className="text-primary font-bold text-sm tracking-widest drop-shadow-md pointer-events-auto hover:underline"
-                  >
+                  <Link href={`/profile?id=${item.uploaderUid}`} className="text-primary font-bold text-sm tracking-widest drop-shadow-md pointer-events-auto hover:underline">
                     {profile?.username || `@creator_${item.uploaderUid.slice(-4)}`}
                   </Link>
                   {!isOwner && !isFollowed && (
-                    <button 
-                      onClick={() => handleFollow(item.uploaderUid)} 
-                      className="pointer-events-auto bg-primary text-black text-[10px] font-bold uppercase px-3 py-1 rounded-full shadow-lg transition-all active:scale-95"
-                    >
+                    <button onClick={() => handleFollow(item.uploaderUid)} className="pointer-events-auto bg-primary text-black text-[10px] font-bold uppercase px-3 py-1 rounded-full shadow-lg transition-all active:scale-95">
                       Follow
                     </button>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-headline font-bold text-white text-lg neon-text">
-                    {item.title || 'Untitled Vibe'}
-                  </h3>
+                  <h3 className="font-headline font-bold text-white text-lg neon-text">{item.title || 'Untitled Vibe'}</h3>
                   <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider border border-primary/30">
                     {item.category || 'General'}
                   </span>
                 </div>
               </div>
-              <p className="text-white/90 text-sm leading-snug line-clamp-2 drop-shadow-md">
-                {item.caption}
-              </p>
+              <p className="text-white/90 text-sm leading-snug line-clamp-2 drop-shadow-md">{item.caption}</p>
             </div>
 
             <div className="absolute bottom-24 right-4 flex flex-col items-center gap-6 z-30">
               <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90 relative">
                 <Link href={`/profile?id=${item.uploaderUid}`} className="p-0.5 rounded-full bg-gradient-to-tr from-primary to-secondary p-0.5 shadow-lg">
                   <div className="bg-black rounded-full overflow-hidden w-12 h-12 border border-black">
-                    <img 
-                      src={profile?.photoURL || `https://ui-avatars.com/api/?name=${item.uploaderUid}&background=33F0FF&color=000`} 
-                      className="w-full h-full object-cover" 
-                      alt="Avatar" 
-                    />
+                    <img src={profile?.photoURL || `https://ui-avatars.com/api/?name=${item.uploaderUid}&background=33F0FF&color=000`} className="w-full h-full object-cover" alt="Avatar" />
                   </div>
                 </Link>
                 {!isFollowed && !isOwner && (

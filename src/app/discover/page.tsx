@@ -41,16 +41,18 @@ export default function DiscoverPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-black text-white p-4 gap-6 overflow-y-auto hide-scrollbar pb-24">
-      <div className="relative mt-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input 
-          className="bg-white/5 border-white/10 pl-10 focus-visible:ring-primary h-12 rounded-xl" 
-          placeholder="Search creators and vibes..." 
-        />
+    <div className="flex flex-col h-full bg-black text-white p-4 gap-6 overflow-y-auto hide-scrollbar pb-24 pt-16">
+      <div className="sticky top-0 z-20 bg-black/80 backdrop-blur-lg pt-4 pb-2 -mx-4 px-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input 
+            className="bg-white/5 border-white/10 pl-10 focus-visible:ring-primary h-12 rounded-xl" 
+            placeholder="Search creators and vibes..." 
+          />
+        </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-2">
+      <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-2 pt-2">
         {categories.map((cat) => (
           <div 
             key={cat.name}
@@ -62,8 +64,8 @@ export default function DiscoverPage() {
         ))}
       </div>
 
-      <div className="space-y-4">
-        <h2 className="font-headline font-bold text-lg neon-text flex items-center gap-2">
+      <div className="space-y-4 pt-4">
+        <h2 className="font-headline font-bold text-lg neon-text flex items-center gap-2 px-1">
           <TrendingUp className="w-5 h-5" />
           Trending Vibes
         </h2>
@@ -77,7 +79,7 @@ export default function DiscoverPage() {
             {trendingVideos.map((video) => (
               <div 
                 key={video.$id} 
-                className="relative aspect-[9/16] bg-zinc-900 rounded-xl overflow-hidden group cursor-pointer shadow-xl"
+                className="relative aspect-[9/16] bg-zinc-900 rounded-xl overflow-hidden group cursor-pointer shadow-xl border border-white/5"
                 onClick={() => router.push(`/?v=${video.youtubeId}`)}
               >
                 <Image 
@@ -89,7 +91,7 @@ export default function DiscoverPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
                   <p className="text-xs font-bold text-white line-clamp-2">{video.title}</p>
                 </div>
-                <div className="absolute bottom-2 left-2 flex items-center gap-1">
+                <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-sm">
                   <Play className="w-2.5 h-2.5 text-white fill-white" />
                   <span className="text-[10px] font-bold text-white">{video.likesCount || 0}</span>
                 </div>
@@ -99,14 +101,14 @@ export default function DiscoverPage() {
         )}
       </div>
 
-      <div className="space-y-4">
-        <h2 className="font-headline font-bold text-lg neon-text">Featured Tags</h2>
+      <div className="space-y-4 pt-4">
+        <h2 className="font-headline font-bold text-lg neon-text px-1">Featured Tags</h2>
         <div className="grid grid-cols-2 gap-4">
-          <div className="aspect-video rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 border border-white/10 flex items-center justify-center p-4 text-center cursor-pointer hover:border-primary/50 transition-colors">
-            <span className="font-bold text-primary">#MumbaiNights</span>
+          <div className="aspect-video rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 border border-white/10 flex items-center justify-center p-4 text-center cursor-pointer hover:border-primary/50 transition-colors shadow-lg group">
+            <span className="font-bold text-primary group-hover:scale-110 transition-transform">#MumbaiNights</span>
           </div>
-          <div className="aspect-video rounded-xl bg-gradient-to-br from-secondary/20 to-blue-500/20 border border-white/10 flex items-center justify-center p-4 text-center cursor-pointer hover:border-secondary/50 transition-colors">
-            <span className="font-bold text-secondary">#FutureIndie</span>
+          <div className="aspect-video rounded-xl bg-gradient-to-br from-secondary/20 to-blue-500/20 border border-white/10 flex items-center justify-center p-4 text-center cursor-pointer hover:border-secondary/50 transition-colors shadow-lg group">
+            <span className="font-bold text-secondary group-hover:scale-110 transition-transform">#FutureIndie</span>
           </div>
         </div>
       </div>
