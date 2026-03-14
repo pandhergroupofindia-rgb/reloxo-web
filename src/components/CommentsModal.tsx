@@ -49,11 +49,6 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
       setComments(response.documents);
     } catch (error: any) {
       console.error('Error fetching comments:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Fetch Error',
-        description: error.message || 'Could not load comments.',
-      });
     } finally {
       setFetching(false);
     }
@@ -73,8 +68,8 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
         videoId: videoId,
         userId: user.$id || user.uid,
         text: newComment.trim(),
-        username: user.username || user.displayName || 'User',
-        userPhoto: user.photoURL || ''
+        username: user.displayName || user.username || "User",
+        photoURL: user.photoURL || ""
       };
 
       await databases.createDocument(
@@ -90,15 +85,11 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
           commentsCount: (videoDoc.commentsCount || 0) + 1
         });
       } catch (countError) {
-        console.warn('Could not update comment count on video document', countError);
+        console.warn('Could not update comment count', countError);
       }
 
       setNewComment('');
       await fetchComments();
-      toast({
-        title: "Comment Posted",
-        description: "Your vibe has been shared.",
-      });
     } catch (error: any) {
       console.error('Error sending comment:', error);
       alert('Error posting comment: ' + error.message);
@@ -110,7 +101,7 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
+    <div className="fixed inset-0 z-[110] flex items-end justify-center sm:items-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       
       <div className="relative w-full max-w-[480px] h-[70vh] bg-[#0a0a0a] border-t border-white/10 rounded-t-[2rem] sm:rounded-[2rem] sm:border sm:h-[600px] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-2xl">
@@ -134,7 +125,7 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
               {comments.map((comment) => (
                 <div key={comment.$id} className="flex gap-3 group">
                   <Avatar className="w-8 h-8 border border-white/10">
-                    <AvatarImage src={comment.userPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.username)}&background=33F0FF&color=000`} />
+                    <AvatarImage src={comment.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.username)}&background=33F0FF&color=000`} />
                     <AvatarFallback className="text-[10px] bg-zinc-900">{comment.username?.[0]}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-1">
@@ -152,7 +143,7 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
           ) : (
             <div className="h-full flex flex-col items-center justify-center opacity-30 gap-4 py-20">
               <MessageCircle className="w-12 h-12" />
-              <p className="text-xs font-bold uppercase tracking-[0.2em]">No comments yet</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em]">No vibes yet</p>
             </div>
           )}
         </ScrollArea>
@@ -162,7 +153,7 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
             <Input 
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add a comment..."
+              placeholder="Add your vibe..."
               className="bg-white/5 border-white/10 rounded-full h-10 focus-visible:ring-primary focus-visible:border-primary text-sm px-4"
               disabled={isLoading}
             />
