@@ -19,6 +19,12 @@ interface UploadModalProps {
 
 const VIDEOS_COLLECTION_ID = 'videos';
 
+const CATEGORIES = [
+  "Entertainment", "Comedy", "Devotional", "Status", "News", 
+  "Sports", "Gaming", "Dance", "Music", "Education", 
+  "Vlogs", "Food", "Tech", "Fashion", "Art"
+];
+
 export function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const { user } = useAuth();
   const [title, setTitle] = useState('');
@@ -134,12 +140,12 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
       <div className="absolute inset-0 bg-black/95 backdrop-blur-sm" onClick={!isUploading ? onClose : undefined} />
       
       <div className="relative w-full h-full sm:h-auto sm:max-w-xl bg-black sm:border sm:border-white/10 sm:rounded-[2.5rem] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
-        <header className="p-4 flex items-center justify-between border-b border-white/5">
-          <Button variant="ghost" size="icon" onClick={onClose} disabled={isUploading} className="text-white hover:bg-white/5">
+        <header className="p-4 flex items-center justify-between border-b border-white/5 bg-black/80 backdrop-blur-md sticky top-0 z-20">
+          <Button variant="ghost" size="icon" onClick={onClose} disabled={isUploading} className="text-white hover:bg-white/5 rounded-full">
             <X className="w-6 h-6" />
           </Button>
           <h2 className="text-lg font-headline font-bold neon-text">Publish Vibe</h2>
-          <Button onClick={handleUpload} disabled={isUploading || !file} className="bg-primary text-black font-bold hover:bg-primary/90 px-6 rounded-full">
+          <Button onClick={handleUpload} disabled={isUploading || !file} className="bg-primary text-black font-bold hover:bg-primary/90 px-6 rounded-full shadow-[0_0_15px_rgba(51,240,255,0.4)]">
             Post
           </Button>
         </header>
@@ -148,7 +154,7 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
           <div className="flex flex-col sm:flex-row gap-6">
             <div 
               onClick={() => !isUploading && fileInputRef.current?.click()}
-              className="relative w-full sm:w-48 aspect-[9/16] bg-white/5 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-all group overflow-hidden"
+              className="relative w-full sm:w-48 aspect-[9/16] bg-white/5 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-all group overflow-hidden shadow-inner"
             >
               <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="video/*" className="hidden" />
               {previewUrl ? (
@@ -170,7 +176,7 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="The next viral hook..."
-                  className="bg-white/5 border-white/10 rounded-xl focus-visible:ring-primary focus-visible:border-primary text-white"
+                  className="bg-white/5 border-white/10 rounded-xl focus-visible:ring-primary focus-visible:border-primary text-white h-12"
                   disabled={isUploading}
                 />
               </div>
@@ -181,7 +187,7 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder="Tell your story... #trending #relox"
-                  className="bg-white/5 border-white/10 rounded-xl min-h-[100px] focus-visible:ring-primary focus-visible:border-primary resize-none text-white"
+                  className="bg-white/5 border-white/10 rounded-xl min-h-[120px] focus-visible:ring-primary focus-visible:border-primary resize-none text-white"
                   disabled={isUploading}
                 />
               </div>
@@ -190,27 +196,26 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase tracking-widest font-bold text-primary">Category</label>
                   <Select value={category} onValueChange={setCategory} disabled={isUploading}>
-                    <SelectTrigger className="bg-white/5 border-white/10 rounded-xl">
+                    <SelectTrigger className="bg-white/5 border-white/10 rounded-xl h-12 text-white">
                       <SelectValue placeholder="Category" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-white">
-                      <SelectItem value="Entertainment">Entertainment</SelectItem>
-                      <SelectItem value="Education">Education</SelectItem>
-                      <SelectItem value="Comedy">Comedy</SelectItem>
-                      <SelectItem value="Gaming">Gaming</SelectItem>
-                      <SelectItem value="Vlog">Vlog</SelectItem>
+                    <SelectContent className="bg-zinc-900 border-white/10 text-white max-h-60">
+                      {CATEGORIES.map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase tracking-widest font-bold text-primary">Visibility</label>
                   <Select value={visibility} onValueChange={setVisibility} disabled={isUploading}>
-                    <SelectTrigger className="bg-white/5 border-white/10 rounded-xl">
+                    <SelectTrigger className="bg-white/5 border-white/10 rounded-xl h-12 text-white">
                       <SelectValue placeholder="Visibility" />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-900 border-white/10 text-white">
                       <SelectItem value="public">Public</SelectItem>
                       <SelectItem value="private">Private</SelectItem>
+                      <SelectItem value="unlisted">Unlisted</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

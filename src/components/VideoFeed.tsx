@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import YouTube, { YouTubeProps } from "react-youtube";
-import { Heart, MessageCircle, Forward, CircleUser, Music2, AlertTriangle, PlusCircle, Check } from "lucide-react";
+import { Heart, MessageCircle, Forward, CircleUser, Music2, AlertTriangle, PlusCircle, Check, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { databases, DATABASE_ID, Query } from "@/lib/appwrite";
@@ -24,7 +24,6 @@ export function VideoFeed() {
   const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   
-  // Interaction States
   const [selectedVideoForComments, setSelectedVideoForComments] = useState<string | null>(null);
 
   useEffect(() => {
@@ -179,7 +178,6 @@ export function VideoFeed() {
       const shareUrl = `${window.location.origin}/?v=${video.youtubeId}`;
       await navigator.clipboard.writeText(shareUrl);
       
-      // Increment share count
       const newSharesCount = (video.sharesCount || 0) + 1;
       await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, video.$id, {
         sharesCount: newSharesCount
@@ -240,7 +238,19 @@ export function VideoFeed() {
   }
 
   return (
-    <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar">
+    <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar relative">
+      {/* Top Navigation Logo */}
+      <div className="absolute top-0 left-0 w-full z-50 p-6 flex items-center justify-between pointer-events-none">
+        <div className="pointer-events-auto">
+          <h1 className="text-2xl font-headline font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
+            Relox
+          </h1>
+        </div>
+        <div className="pointer-events-auto p-2 bg-black/20 backdrop-blur-md rounded-full border border-white/10 cursor-pointer hover:bg-white/10 transition-colors">
+          <Search className="w-5 h-5 text-white" />
+        </div>
+      </div>
+
       {videos.map((video) => (
         <section
           key={video.$id}
@@ -279,7 +289,6 @@ export function VideoFeed() {
           </div>
 
           <div className="absolute bottom-24 right-4 flex flex-col items-center gap-6 z-10">
-            {/* Creator Follow */}
             <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90 relative">
               <div className="p-0.5 rounded-full bg-gradient-to-tr from-primary to-secondary p-0.5 shadow-lg">
                 <div className="bg-black rounded-full p-0.5">
@@ -301,7 +310,6 @@ export function VideoFeed() {
               )}
             </div>
 
-            {/* Like */}
             <div 
               onClick={() => handleLike(video.$id, video.likesCount || 0)}
               className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
@@ -317,7 +325,6 @@ export function VideoFeed() {
               </span>
             </div>
 
-            {/* Comment */}
             <div 
               onClick={() => setSelectedVideoForComments(video.$id)}
               className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
@@ -330,7 +337,6 @@ export function VideoFeed() {
               </span>
             </div>
 
-            {/* Share */}
             <div 
               onClick={() => handleShare(video)}
               className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
