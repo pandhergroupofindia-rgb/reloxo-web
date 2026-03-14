@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import YouTube, { YouTubeProps } from "react-youtube";
-import { Heart, MessageCircle, Forward, CircleUser, Music2 } from "lucide-react";
+import { Heart, MessageCircle, Forward, CircleUser, Music2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { databases, DATABASE_ID, Query } from "@/lib/appwrite";
@@ -16,6 +16,7 @@ export function VideoFeed() {
   const [videos, setVideos] = useState<any[]>([]);
   const [likedVideos, setLikedVideos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export function VideoFeed() {
   }, [user, videos]);
 
   const fetchVideos = async () => {
+    setError(null);
     try {
       const response = await databases.listDocuments(
         DATABASE_ID,
@@ -37,11 +39,13 @@ export function VideoFeed() {
         [Query.orderDesc('$createdAt'), Query.limit(20)]
       );
       setVideos(response.documents);
-    } catch (error: any) {
-      console.error('Error fetching videos:', error);
-      // Detailed logging for Appwrite errors
-      if (error.message === 'Failed to fetch') {
-        console.warn('Network error: Ensure your domain is added to Appwrite Platforms and no ad-blockers are interfering.');
+    } catch (err: any) {
+      console.error('Error fetching videos:', err);
+      if (err.message?.includes('fetch') || err.name === 'TypeError') {
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : 'your domain';
+        setError(`Connection failed. Please ensure "${hostname}" is added as a Web Platform in your Appwrite Project.`);
+      } else {
+        setError(err.message || 'Failed to sync vibes.');
       }
     } finally {
       setLoading(false);
@@ -63,7 +67,6 @@ export function VideoFeed() {
   };
 
   const onPlayerReady: YouTubeProps["onReady"] = (event) => {
-    // Attempt to play, noting browser autoplay policies might block it
     event.target.playVideo();
   };
 
@@ -93,7 +96,6 @@ export function VideoFeed() {
 
     try {
       if (isLiked) {
-        // Unlike logic
         const existingLikes = await databases.listDocuments(
           DATABASE_ID,
           LIKES_COLLECTION_ID,
@@ -112,7 +114,6 @@ export function VideoFeed() {
         setLikedVideos(prev => prev.filter(id => id !== videoId));
         setVideos(prev => prev.map(v => v.$id === videoId ? { ...v, likesCount: newLikesCount } : v));
       } else {
-        // Like logic
         await databases.createDocument(DATABASE_ID, LIKES_COLLECTION_ID, ID.unique(), {
           userId: userId,
           videoId: videoId
@@ -142,6 +143,28 @@ export function VideoFeed() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="h-full w-full bg-black flex flex-col items-center justify-center p-8 text-center gap-6">
+        <div className="p-4 rounded-full bg-destructive/10 border border-destructive/20">
+          <AlertTriangle className="w-12 h-12 text-destructive" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-headline font-bold text-white">Sync Failed</h2>
+          <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+            {error}
+          </p>
+        </div>
+        <button 
+          onClick={fetchVideos}
+          className="px-6 py-2 bg-white/5 border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
+        >
+          Retry Connection
+        </button>
+      </div>
+    );
+  }
+
   if (videos.length === 0) {
     return (
       <div className="h-full w-full bg-black flex flex-col items-center justify-center p-8 text-center gap-4">
@@ -161,7 +184,6 @@ export function VideoFeed() {
           key={video.$id}
           className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden"
         >
-          {/* YouTube Background */}
           <div className="absolute inset-0 w-full h-full pointer-events-none">
             <YouTube
               videoId={video.youtubeId}
@@ -172,10 +194,8 @@ export function VideoFeed() {
             />
           </div>
 
-          {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 pointer-events-none" />
 
-          {/* Video Metadata Overlay */}
           <div className="absolute bottom-24 left-4 right-20 flex flex-col gap-3 z-10 animate-in slide-in-from-left-4 duration-500">
             <div className="flex items-center gap-2">
               <h3 className="font-headline font-bold text-white text-lg neon-text">
@@ -196,9 +216,7 @@ export function VideoFeed() {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="absolute bottom-24 right-4 flex flex-col items-center gap-6 z-10">
-            {/* Profile */}
             <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
               <div className="p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 relative">
                 <CircleUser className="w-10 h-10 text-white" />
@@ -208,7 +226,6 @@ export function VideoFeed() {
               </div>
             </div>
 
-            {/* Like */}
             <div 
               onClick={() => handleLike(video.$id, video.likesCount || 0)}
               className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
@@ -224,7 +241,6 @@ export function VideoFeed() {
               </span>
             </div>
 
-            {/* Comment */}
             <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
               <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
                 <MessageCircle className="w-7 h-7 text-white" />
@@ -232,7 +248,6 @@ export function VideoFeed() {
               <span className="text-[10px] font-bold text-white drop-shadow-md">{video.commentsCount || 0}</span>
             </div>
 
-            {/* Share */}
             <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
               <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
                 <Forward className="w-7 h-7 text-white" />

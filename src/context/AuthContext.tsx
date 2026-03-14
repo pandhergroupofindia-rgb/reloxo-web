@@ -38,13 +38,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const profileDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, currentAccount.$id);
           const profile = JSON.parse(profileDoc.profileData || '{}');
           setUser({ ...currentAccount, ...profile });
-        } catch (e) {
-          // No profile yet, trigger onboarding if it's a new session
+        } catch (e: any) {
+          // No profile yet, trigger onboarding
           setTempUser(currentAccount);
           setIsOnboardingOpen(true);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message?.includes('fetch') || error.name === 'TypeError') {
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : 'your domain';
+        console.warn(`Appwrite connection failed. Make sure "${hostname}" is added as a Web Platform in Appwrite.`);
+      }
       setUser(null);
     } finally {
       setLoading(false);
