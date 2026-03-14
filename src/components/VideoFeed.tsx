@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import YouTube, { YouTubeProps } from "react-youtube";
-import { Heart, MessageCircle, Forward, PlusCircle, Check, Search, MoreVertical, Trash2, Music2, AlertTriangle, Play, Pause } from "lucide-react";
+import YouTube from "react-youtube";
+import { Heart, MessageCircle, Forward, PlusCircle, Search, MoreVertical, Trash2, AlertTriangle, Play, Pause } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { databases, DATABASE_ID, Query, COLLECTION_ID } from "@/lib/appwrite";
@@ -85,7 +85,8 @@ export function VideoFeed() {
 
   const fetchUserLikes = async () => {
     try {
-      const userId = user.$id || user.uid;
+      const userId = user?.$id || user?.uid;
+      if (!userId) return;
       const response = await databases.listDocuments(
         DATABASE_ID,
         LIKES_COLLECTION_ID,
@@ -97,7 +98,8 @@ export function VideoFeed() {
 
   const fetchUserFollows = async () => {
     try {
-      const userId = user.$id || user.uid;
+      const userId = user?.$id || user?.uid;
+      if (!userId) return;
       const response = await databases.listDocuments(
         DATABASE_ID,
         FOLLOWERS_COLLECTION_ID,
@@ -114,7 +116,7 @@ export function VideoFeed() {
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
       // Double Tap (Like)
       if (!likedVideos.includes(video.$id)) {
-        handleLike(video.$id, video.likesCount || 0);
+        await handleLike(video.$id, video.likesCount || 0);
       }
       setShowInteractionIcon('like');
       setTimeout(() => setShowInteractionIcon(null), 800);
@@ -299,6 +301,7 @@ export function VideoFeed() {
 
         const profile = userProfiles[item.uploaderUid];
         const isOwner = user && item.uploaderUid === (user.$id || user.uid);
+        const isFollowed = followedUsers.includes(item.uploaderUid);
 
         return (
           <section key={item.$id} className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden">
@@ -333,9 +336,22 @@ export function VideoFeed() {
 
             <div className="absolute bottom-24 left-4 right-20 flex flex-col gap-3 z-30 animate-in slide-in-from-left-4 duration-500 pointer-events-none">
               <div className="flex flex-col gap-1">
-                <span className="text-primary font-bold text-sm tracking-widest drop-shadow-md">
-                  {profile?.username || `@creator_${item.uploaderUid.slice(-4)}`}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span 
+                    className="text-primary font-bold text-sm tracking-widest drop-shadow-md cursor-pointer pointer-events-auto hover:underline"
+                    onClick={() => alert(`Redirecting to ${item.uploaderUid}'s profile...`)}
+                  >
+                    {profile?.username || `@creator_${item.uploaderUid.slice(-4)}`}
+                  </span>
+                  {!isOwner && !isFollowed && (
+                    <button 
+                      onClick={() => handleFollow(item.uploaderUid)} 
+                      className="pointer-events-auto bg-primary/20 hover:bg-primary/40 text-primary border border-primary/50 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full backdrop-blur-sm transition-all"
+                    >
+                      Follow
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-headline font-bold text-white text-lg neon-text">
                     {item.title || 'Untitled Vibe'}
@@ -354,10 +370,15 @@ export function VideoFeed() {
               <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90 relative">
                 <div className="p-0.5 rounded-full bg-gradient-to-tr from-primary to-secondary p-0.5 shadow-lg">
                   <div className="bg-black rounded-full overflow-hidden w-10 h-10 border border-black">
-                    <img src={profile?.photoURL || `https://ui-avatars.com/api/?name=${item.uploaderUid}&background=33F0FF&color=000`} className="w-full h-full object-cover" alt="Avatar" />
+                    <img 
+                      src={profile?.photoURL || `https://ui-avatars.com/api/?name=${item.uploaderUid}&background=33F0FF&color=000`} 
+                      className="w-full h-full object-cover" 
+                      alt="Avatar" 
+                      onClick={() => alert(`Redirecting to ${item.uploaderUid}'s profile...`)}
+                    />
                   </div>
                 </div>
-                {!followedUsers.includes(item.uploaderUid) && !isOwner && (
+                {!isFollowed && !isOwner && (
                   <button onClick={() => handleFollow(item.uploaderUid)} className="absolute -bottom-2 bg-primary rounded-full p-0.5 border-2 border-black hover:scale-110 transition-transform">
                     <PlusCircle className="w-4 h-4 text-black" />
                   </button>
@@ -388,7 +409,7 @@ export function VideoFeed() {
               {isOwner && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="p-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                    <button className="p-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors pointer-events-auto">
                       <MoreVertical className="w-5 h-5 text-white/50" />
                     </button>
                   </DropdownMenuTrigger>

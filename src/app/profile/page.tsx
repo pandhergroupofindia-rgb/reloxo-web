@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Grid, Heart, Bookmark, LogOut, Settings, Play, Shield, FileText, ChevronRight, MessageSquare, CheckCircle2, User, Loader2, Coins, Wallet } from 'lucide-react';
+import { Grid, Heart, Bookmark, LogOut, Settings, Play, Shield, FileText, ChevronRight, MessageSquare, CheckCircle2, Loader2, Coins, Wallet } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { databases, DATABASE_ID, Query, COLLECTION_ID } from '@/lib/appwrite';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 const VIDEOS_COLLECTION_ID = 'videos';
 
@@ -32,21 +33,25 @@ function ProfileContent() {
 
   useEffect(() => {
     if (user) {
-      setEditData({ name: user.displayName || '', bio: user.bio || '' });
+      setEditData({ 
+        name: user?.displayName || user?.name || '', 
+        bio: user?.bio || '' 
+      });
     }
   }, [user]);
 
   useEffect(() => {
-    if (user?.$id || user?.uid || viewingOtherUserId) {
-      fetchUserVideos();
+    const targetId = viewingOtherUserId || user?.$id || user?.uid;
+    if (targetId) {
+      fetchUserVideos(targetId);
+    } else if (!loading && !viewingOtherUserId) {
+      setFetchingVideos(false);
     }
-  }, [user, viewingOtherUserId]);
+  }, [user, viewingOtherUserId, loading]);
 
-  const fetchUserVideos = async () => {
+  const fetchUserVideos = async (targetId: string) => {
     try {
-      const targetId = viewingOtherUserId || user?.$id || user?.uid;
-      if (!targetId) return;
-
+      setFetchingVideos(true);
       const response = await databases.listDocuments(
         DATABASE_ID,
         VIDEOS_COLLECTION_ID,
@@ -64,7 +69,7 @@ function ProfileContent() {
   };
 
   const handleUpdateProfile = async () => {
-    if (!user) return;
+    if (!user?.$id) return;
     setIsUpdating(true);
     try {
       const currentProfileDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, user.$id);
@@ -92,13 +97,17 @@ function ProfileContent() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-black">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      <div className="flex flex-col items-center justify-center h-full bg-black gap-4">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+        <p className="text-primary text-xs font-bold tracking-[0.2em] uppercase">Loading Vibe...</p>
       </div>
     );
   }
 
-  if (!user && !viewingOtherUserId) {
+  const targetUser = user; // Simplification for now
+  const isOwnProfile = !viewingOtherUserId || viewingOtherUserId === (user?.$id || user?.uid);
+
+  if (!isOwnProfile && !viewingOtherUserId) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 text-center bg-black">
         <h2 className="text-xl font-headline font-bold mb-4 text-white">Profile not found</h2>
@@ -107,27 +116,25 @@ function ProfileContent() {
     );
   }
 
-  const isOwnProfile = !viewingOtherUserId || viewingOtherUserId === (user?.$id || user?.uid);
-
   return (
     <div className="flex flex-col h-full bg-black text-white overflow-y-auto hide-scrollbar">
       <div className="p-6 flex flex-col items-center gap-6 border-b border-white/5 pt-10 relative">
         <div className="relative group">
           <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/40 transition-all" />
           <Avatar className="w-28 h-28 border-4 border-black ring-2 ring-primary relative z-10 shadow-[0_0_20px_rgba(51,240,255,0.3)]">
-            <AvatarImage src={user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.displayName || 'U')}&background=33F0FF&color=000`} alt={user?.name} />
-            <AvatarFallback className="bg-zinc-900 text-2xl font-bold">{user?.name?.charAt(0) || 'U'}</AvatarFallback>
+            <AvatarImage src={targetUser?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(targetUser?.displayName || targetUser?.name || 'U')}&background=33F0FF&color=000`} alt={targetUser?.name} />
+            <AvatarFallback className="bg-zinc-900 text-2xl font-bold">{targetUser?.name?.charAt(0) || 'U'}</AvatarFallback>
           </Avatar>
         </div>
         
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-1.5">
-            <h1 className="text-2xl font-headline font-bold neon-text">{user?.displayName || user?.name}</h1>
-            {user?.isVerified && <CheckCircle2 className="w-4 h-4 text-primary fill-primary/20" />}
+            <h1 className="text-2xl font-headline font-bold neon-text">{targetUser?.displayName || targetUser?.name || 'Viber'}</h1>
+            {targetUser?.isVerified && <CheckCircle2 className="w-4 h-4 text-primary fill-primary/20" />}
           </div>
-          <p className="text-primary text-sm font-bold tracking-widest">{user?.username || '@viber'}</p>
+          <p className="text-primary text-sm font-bold tracking-widest">{targetUser?.username || '@viber'}</p>
           <p className="text-muted-foreground text-xs max-w-[250px] mt-2 line-clamp-2 italic px-4">
-            {user?.bio || 'Setting the stage for the next big vibe. ⚡'}
+            {targetUser?.bio || 'Setting the stage for the next big vibe. ⚡'}
           </p>
         </div>
 
@@ -190,22 +197,14 @@ function ProfileContent() {
                   <div className="py-8 text-center space-y-6">
                     <div className="p-6 bg-black/40 rounded-3xl border border-white/5 space-y-2">
                       <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Wallet Balance</p>
-                      <h3 className="text-4xl font-headline font-bold text-white">₹{user?.walletBalance || 0}</h3>
+                      <h3 className="text-4xl font-headline font-bold text-white">₹{targetUser?.walletBalance || 0}</h3>
                     </div>
-                    
-                    <div className="space-y-2 text-left bg-white/5 p-4 rounded-2xl">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">Monetization Status</h4>
-                      <p className="text-[10px] text-muted-foreground leading-relaxed">
-                        Earn from every 1,000 views. Minimum withdrawal is ₹8,000.
-                      </p>
-                    </div>
-
                     <Button 
                       className={cn(
                         "w-full h-14 rounded-2xl font-bold uppercase tracking-widest transition-all",
-                        (user?.walletBalance || 0) >= 8000 ? "bg-primary text-black shadow-[0_0_20px_rgba(51,240,255,0.4)]" : "bg-white/5 text-white/20 cursor-not-allowed"
+                        (targetUser?.walletBalance || 0) >= 8000 ? "bg-primary text-black shadow-[0_0_20px_rgba(51,240,255,0.4)]" : "bg-white/5 text-white/20 cursor-not-allowed"
                       )}
-                      disabled={(user?.walletBalance || 0) < 8000}
+                      disabled={(targetUser?.walletBalance || 0) < 8000}
                     >
                       Withdraw Funds
                     </Button>
@@ -244,7 +243,7 @@ function ProfileContent() {
           ) : (
             <>
               <Button className="flex-1 bg-primary text-black hover:bg-primary/90 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px]">Follow</Button>
-              <Button variant="outline" className="flex-1 border-white/10 bg-white/5 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px] flex items-center gap-2">
+              <Button variant="outline" className="flex-1 border-white/10 bg-white/5 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px] flex items-center gap-2" onClick={() => alert("Redirecting to chat...")}>
                 <MessageSquare className="w-3 h-3" /> Message
               </Button>
             </>
@@ -265,10 +264,10 @@ function ProfileContent() {
           ) : userVideos.length > 0 ? (
             <div className="grid grid-cols-3 gap-0.5">
               {userVideos.map((video) => (
-                <div key={video.$id} className="relative aspect-[3/4] bg-zinc-900 overflow-hidden group cursor-pointer" onClick={() => router.push(`/?v=${video.youtubeId}`)}>
+                <div key={video?.$id} className="relative aspect-[3/4] bg-zinc-900 overflow-hidden group cursor-pointer" onClick={() => router.push(`/?v=${video?.youtubeId}`)}>
                   <Image 
-                    src={video.thumbnailUrl || `https://img.youtube.com/vi/${video.youtubeId}/0.jpg`}
-                    alt={video.title}
+                    src={video?.thumbnailUrl || `https://img.youtube.com/vi/${video?.youtubeId}/0.jpg`}
+                    alt={video?.title || "Vibe"}
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
                   />
@@ -277,7 +276,7 @@ function ProfileContent() {
                   </div>
                   <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1">
                     <Play className="w-2.5 h-2.5 text-white fill-white" />
-                    <span className="text-[10px] font-bold text-white">{video.likesCount || 0}</span>
+                    <span className="text-[10px] font-bold text-white">{video?.likesCount || 0}</span>
                   </div>
                 </div>
               ))}
@@ -306,7 +305,7 @@ function ProfileContent() {
 
 export default function ProfilePage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-full bg-black"><Loader2 className="w-8 h-8 text-primary animate-spin" /></div>}>
+    <Suspense fallback={<div className="flex flex-col items-center justify-center h-full bg-black gap-4"><Loader2 className="w-10 h-10 text-primary animate-spin" /><p className="text-primary text-xs font-bold tracking-[0.2em] uppercase">Loading Profile...</p></div>}>
       <ProfileContent />
     </Suspense>
   );

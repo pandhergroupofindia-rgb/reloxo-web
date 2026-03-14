@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload, Film, Loader2, Sparkles, CheckCircle2, Image as ImageIcon } from 'lucide-react';
+import { X, Upload, Film, Loader2, Sparkles, CheckCircle2, Image as ImageIcon, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,17 +20,17 @@ interface UploadModalProps {
 const VIDEOS_COLLECTION_ID = 'videos';
 
 const CATEGORIES = [
-  "Entertainment", "Comedy", "Devotional", "Status", "News", 
-  "Sports", "Gaming", "Dance", "Music", "Education", 
-  "Vlogs", "Food", "Tech", "Fashion", "Art"
+  "Entertainment", "Comedy", "Devotional", "News", "Gaming", "Music", "Vlogs", "Tech", "Sports", "Status", "Food", "Fashion", "Art", "Education"
 ];
+
+const VISIBILITIES = ["Public", "Private", "Unlisted"];
 
 export function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [caption, setCaption] = useState('');
   const [category, setCategory] = useState('Entertainment');
-  const [visibility, setVisibility] = useState('public');
+  const [visibility, setVisibility] = useState('Public');
   const [file, setFile] = useState<File | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -38,7 +38,9 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'success'>('idle');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const thumbInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -92,8 +94,9 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
       }
 
       const tokenRes = await fetch('/api/yt-token');
-      const { access_token, error } = await tokenRes.json();
-      if (error) throw new Error(error);
+      const tokenData = await tokenRes.json();
+      if (tokenData.error) throw new Error(tokenData.error);
+      const access_token = tokenData.access_token;
 
       const metadata = {
         snippet: {
@@ -102,7 +105,7 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
           categoryId: '22',
         },
         status: {
-          privacyStatus: 'unlisted',
+          privacyStatus: 'unlisted', // Always unlisted on YT to keep it silent
         },
       };
 
@@ -177,18 +180,23 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
         <div className="flex-1 overflow-y-auto p-4 space-y-6 hide-scrollbar pb-24">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <div 
-                onClick={() => !isUploading && fileInputRef.current?.click()}
-                className="relative aspect-[9/16] bg-white/5 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-all group overflow-hidden shadow-inner"
-              >
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="video/*" className="hidden" />
+              <div className="relative aspect-[9/16] bg-white/5 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center group overflow-hidden shadow-inner">
                 {previewUrl ? (
                   <video src={previewUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
                 ) : (
-                  <>
-                    <Upload className="w-10 h-10 text-muted-foreground group-hover:text-primary transition-colors mb-4" />
-                    <span className="text-xs text-muted-foreground uppercase font-bold tracking-widest">Select Video</span>
-                  </>
+                  <div className="flex flex-col items-center gap-4">
+                     <Upload className="w-10 h-10 text-muted-foreground" />
+                     <div className="flex flex-col gap-2">
+                        <Button variant="outline" size="sm" className="bg-primary/10 border-primary/30 text-primary h-10 px-4 rounded-xl" onClick={() => cameraInputRef.current?.click()}>
+                           <Camera className="w-4 h-4 mr-2" /> Record
+                        </Button>
+                        <Button variant="outline" size="sm" className="bg-white/5 border-white/10 text-white h-10 px-4 rounded-xl" onClick={() => galleryInputRef.current?.click()}>
+                           <Upload className="w-4 h-4 mr-2" /> Gallery
+                        </Button>
+                     </div>
+                     <input type="file" ref={cameraInputRef} onChange={handleFileChange} accept="video/*" capture="environment" className="hidden" />
+                     <input type="file" ref={galleryInputRef} onChange={handleFileChange} accept="video/*" className="hidden" />
+                  </div>
                 )}
               </div>
 
@@ -254,9 +262,9 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
                       <SelectValue placeholder="Visibility" />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-900 border-white/10 text-white">
-                      <SelectItem value="public">Public</SelectItem>
-                      <SelectItem value="private">Private</SelectItem>
-                      <SelectItem value="unlisted">Unlisted</SelectItem>
+                      {VISIBILITIES.map(v => (
+                        <SelectItem key={v} value={v}>{v}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
