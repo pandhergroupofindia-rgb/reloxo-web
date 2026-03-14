@@ -5,6 +5,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { GlobalLoginModal } from '@/components/GlobalLoginModal';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { Toaster } from '@/components/ui/toaster';
+import { CookieBanner } from '@/components/CookieBanner';
 
 export const metadata: Metadata = {
   title: 'Relox - Short Video Discovery',
@@ -39,6 +40,7 @@ export default function RootLayout({
             <BottomNav />
             <GlobalLoginModal />
             <OnboardingModal />
+            <CookieBanner />
           </div>
           <Toaster />
         </AuthProvider>

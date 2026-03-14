@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -317,11 +316,11 @@ function ProfileContent() {
             <div className="grid grid-cols-3 gap-0.5">
               {userVideos.map((video) => (
                 <div key={video?.$id} className="relative aspect-[3/4] bg-zinc-900 overflow-hidden group cursor-pointer" onClick={() => router.push(`/?v=${video?.youtubeId}`)}>
-                  <Image 
-                    src={video?.thumbnailUrl || `https://img.youtube.com/vi/${video?.youtubeId}/hqdefault.jpg`}
+                  <img 
+                    src={video?.thumbnailUrl || `https://i.ytimg.com/vi/${video?.youtubeId}/0.jpg`}
                     alt={video?.title || "Vibe"}
-                    fill
-                    className="object-cover group-hover:scale-110 transition-transform duration-500"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    loading="lazy"
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Play className="w-6 h-6 text-white fill-white" />

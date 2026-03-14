@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 const VIDEOS_COLLECTION_ID = 'videos';
 const LIKES_COLLECTION_ID = 'likes';
 const FOLLOWERS_COLLECTION_ID = 'followers';
+const REPORTS_COLLECTION_ID = 'reports';
 
 export function VideoFeed() {
   const { user, openLoginModal } = useAuth();
@@ -280,6 +281,34 @@ export function VideoFeed() {
     } catch (error) { }
   };
 
+  const handleReport = async (video: any) => {
+    if (!user) {
+      openLoginModal();
+      return;
+    }
+    const reason = window.prompt("Why are you reporting this video? (e.g., Spam, Inappropriate content, Copyright)");
+    if (reason && reason.trim()) {
+      try {
+        await databases.createDocument(
+          DATABASE_ID,
+          REPORTS_COLLECTION_ID,
+          ID.unique(),
+          {
+            videoId: video.$id,
+            reporterId: user.$id || user.uid,
+            reason: reason.trim()
+          }
+        );
+        toast({
+          title: "Vibe Reported",
+          description: "Our team will review this content. Thank you for keeping Relox safe.",
+        });
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Report Failed' });
+      }
+    }
+  };
+
   const handleDelete = async (videoId: string) => {
     if (!confirm('Are you sure you want to delete this vibe?')) return;
     try {
@@ -434,6 +463,13 @@ export function VideoFeed() {
                   <Forward className="w-7 h-7 text-white" />
                 </div>
                 <span className="text-[10px] font-bold text-white drop-shadow-md">{item.sharesCount || 0}</span>
+              </div>
+
+              <div onClick={() => handleReport(item)} className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
+                <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors shadow-lg">
+                  <AlertTriangle className="w-7 h-7 text-white/70" />
+                </div>
+                <span className="text-[10px] font-bold text-white/50 drop-shadow-md">Report</span>
               </div>
 
               {isOwner && (

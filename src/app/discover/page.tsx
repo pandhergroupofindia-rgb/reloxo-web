@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Search, TrendingUp, Music2, Camera, Gamepad2, Loader2, Play } from 'lucide-react';
 import { databases, DATABASE_ID, Query } from '@/lib/appwrite';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 const VIDEOS_COLLECTION_ID = 'videos';
@@ -73,7 +72,6 @@ export default function DiscoverPage() {
               <TrendingUp className="w-5 h-5" />
               Trending Vibes
             </h2>
-            <button className="text-[10px] uppercase tracking-widest text-primary font-bold">See All</button>
           </div>
           
           {loading ? (
@@ -89,11 +87,11 @@ export default function DiscoverPage() {
                   className="relative aspect-[9/16] bg-zinc-900 rounded-2xl overflow-hidden group cursor-pointer shadow-xl border border-white/5"
                   onClick={() => router.push(`/?v=${video.youtubeId}`)}
                 >
-                  <Image 
-                    src={video.thumbnailUrl || `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`}
+                  <img 
+                    src={video.thumbnailUrl || `https://i.ytimg.com/vi/${video.youtubeId}/hqdefault.jpg`}
                     alt={video.title}
-                    fill
-                    className="object-cover group-hover:scale-110 transition-transform duration-500"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    loading="lazy"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
                     <p className="text-xs font-bold text-white line-clamp-2">{video.title}</p>
