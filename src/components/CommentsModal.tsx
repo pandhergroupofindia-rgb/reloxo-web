@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Send, MessageCircle, AlertCircle } from 'lucide-react';
+import { X, Send, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
@@ -84,7 +84,6 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
         commentData
       );
 
-      // Try to update the count on the video
       try {
         const videoDoc = await databases.getDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId);
         await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId, {
@@ -96,6 +95,10 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
 
       setNewComment('');
       await fetchComments();
+      toast({
+        title: "Comment Posted",
+        description: "Your vibe has been shared.",
+      });
     } catch (error: any) {
       console.error('Error sending comment:', error);
       alert('Error posting comment: ' + error.message);

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import YouTube, { YouTubeProps } from "react-youtube";
-import { Heart, MessageCircle, Forward, CircleUser, Music2, AlertTriangle, PlusCircle, Check, Search, MoreVertical, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, Forward, Music2, AlertTriangle, PlusCircle, Check, Search, MoreVertical, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { databases, DATABASE_ID, Query, COLLECTION_ID } from "@/lib/appwrite";
@@ -50,7 +50,6 @@ export function VideoFeed() {
       );
       setVideos(response.documents);
       
-      // Fetch uploader profiles
       const uploaderIds = Array.from(new Set(response.documents.map((v: any) => v.uploaderUid)));
       uploaderIds.forEach(id => fetchUserProfile(id));
       
