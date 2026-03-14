@@ -4,13 +4,14 @@ import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Grid, Heart, Bookmark, LogOut, Settings, Play, Shield, FileText, ChevronRight, MessageSquare, CheckCircle2, Loader2, Coins, Wallet } from 'lucide-react';
+import { Grid, Heart, Bookmark, LogOut, Settings, Play, Shield, FileText, ChevronRight, MessageSquare, CheckCircle2, Loader2, Coins, Wallet, ArrowLeft } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { databases, DATABASE_ID, Query, COLLECTION_ID } from '@/lib/appwrite';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +22,7 @@ const VIDEOS_COLLECTION_ID = 'videos';
 function ProfileContent() {
   const { user, logout, loading } = useAuth();
   const { toast } = useToast();
+  const [targetUser, setTargetUser] = useState<any>(null);
   const [userVideos, setUserVideos] = useState<any[]>([]);
   const [fetchingVideos, setFetchingVideos] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -32,13 +34,29 @@ function ProfileContent() {
   const viewingOtherUserId = searchParams.get('id');
 
   useEffect(() => {
-    if (user) {
+    if (user && !viewingOtherUserId) {
+      setTargetUser(user);
       setEditData({ 
         name: user?.displayName || user?.name || '', 
         bio: user?.bio || '' 
       });
     }
-  }, [user]);
+  }, [user, viewingOtherUserId]);
+
+  useEffect(() => {
+    const fetchTargetProfile = async () => {
+      if (!viewingOtherUserId) return;
+      try {
+        const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, viewingOtherUserId);
+        const profile = JSON.parse(doc.profileData || '{}');
+        setTargetUser({ ...doc, ...profile });
+      } catch (e) {
+        console.error('Error fetching target profile:', e);
+      }
+    };
+
+    fetchTargetProfile();
+  }, [viewingOtherUserId]);
 
   useEffect(() => {
     const targetId = viewingOtherUserId || user?.$id || user?.uid;
@@ -95,7 +113,7 @@ function ProfileContent() {
     }
   };
 
-  if (loading) {
+  if (loading || (viewingOtherUserId && !targetUser)) {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-black gap-4">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
@@ -104,21 +122,21 @@ function ProfileContent() {
     );
   }
 
-  const targetUser = user; // Simplification for now
   const isOwnProfile = !viewingOtherUserId || viewingOtherUserId === (user?.$id || user?.uid);
-
-  if (!isOwnProfile && !viewingOtherUserId) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center bg-black">
-        <h2 className="text-xl font-headline font-bold mb-4 text-white">Profile not found</h2>
-        <Button onClick={() => router.push('/')} variant="link" className="text-primary">Return Home</Button>
-      </div>
-    );
-  }
+  const walletProgress = Math.min(100, ((targetUser?.walletBalance || 0) / 8000) * 100);
 
   return (
-    <div className="flex flex-col h-full bg-black text-white overflow-y-auto hide-scrollbar">
-      <div className="p-6 flex flex-col items-center gap-6 border-b border-white/5 pt-10 relative">
+    <div className="flex flex-col h-full bg-black text-white overflow-y-auto hide-scrollbar pb-24">
+      {viewingOtherUserId && (
+        <button 
+          onClick={() => router.back()}
+          className="absolute top-4 left-4 z-50 p-2 bg-white/5 rounded-full border border-white/10 hover:bg-white/10 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+      )}
+
+      <div className="p-6 flex flex-col items-center gap-6 border-b border-white/5 pt-12 relative">
         <div className="relative group">
           <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/40 transition-all" />
           <Avatar className="w-28 h-28 border-4 border-black ring-2 ring-primary relative z-10 shadow-[0_0_20px_rgba(51,240,255,0.3)]">
@@ -195,19 +213,29 @@ function ProfileContent() {
                     </DialogTitle>
                   </DialogHeader>
                   <div className="py-8 text-center space-y-6">
-                    <div className="p-6 bg-black/40 rounded-3xl border border-white/5 space-y-2">
-                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Wallet Balance</p>
-                      <h3 className="text-4xl font-headline font-bold text-white">₹{targetUser?.walletBalance || 0}</h3>
+                    <div className="p-6 bg-black/40 rounded-3xl border border-white/5 space-y-4">
+                      <div className="flex justify-between items-end">
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Wallet Balance</p>
+                        <span className="text-primary font-bold text-xs">₹8000 goal</span>
+                      </div>
+                      <h3 className="text-4xl font-headline font-bold text-white text-left">₹{targetUser?.walletBalance || 0}</h3>
+                      <Progress value={walletProgress} className="h-2 bg-white/10" />
                     </div>
+                    
                     <Button 
                       className={cn(
                         "w-full h-14 rounded-2xl font-bold uppercase tracking-widest transition-all",
-                        (targetUser?.walletBalance || 0) >= 8000 ? "bg-primary text-black shadow-[0_0_20px_rgba(51,240,255,0.4)]" : "bg-white/5 text-white/20 cursor-not-allowed"
+                        (targetUser?.walletBalance || 0) >= 8000 
+                          ? "bg-primary text-black shadow-[0_0_20px_rgba(51,240,255,0.4)] animate-pulse" 
+                          : "bg-white/5 text-white/20 cursor-not-allowed"
                       )}
                       disabled={(targetUser?.walletBalance || 0) < 8000}
                     >
-                      Withdraw Funds
+                      Withdraw ₹8000
                     </Button>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest leading-relaxed">
+                      Minimum withdrawal threshold is ₹8000. Keep creating vibes!
+                    </p>
                   </div>
                 </DialogContent>
               </Dialog>

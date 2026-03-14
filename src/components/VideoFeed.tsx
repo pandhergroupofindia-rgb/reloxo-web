@@ -10,6 +10,8 @@ import { ID } from "appwrite";
 import { CommentsModal } from "./CommentsModal";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const VIDEOS_COLLECTION_ID = 'videos';
 const LIKES_COLLECTION_ID = 'likes';
@@ -18,6 +20,7 @@ const FOLLOWERS_COLLECTION_ID = 'followers';
 export function VideoFeed() {
   const { user, openLoginModal } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   const [feed, setFeed] = useState<any[]>([]);
   const [likedVideos, setLikedVideos] = useState<string[]>([]);
   const [followedUsers, setFollowedUsers] = useState<string[]>([]);
@@ -27,10 +30,11 @@ export function VideoFeed() {
   const [isMounted, setIsMounted] = useState(false);
   const [selectedVideoForComments, setSelectedVideoForComments] = useState<string | null>(null);
   
-  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
+  const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [showInteractionIcon, setShowInteractionIcon] = useState<'play' | 'pause' | 'like' | null>(null);
   const playerRefs = useRef<Record<string, any>>({});
   const lastTap = useRef<number>(0);
+  const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -43,6 +47,36 @@ export function VideoFeed() {
       fetchUserFollows();
     }
   }, [user, feed]);
+
+  // Handle intersection for playback control
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const videoId = entry.target.getAttribute('data-video-id');
+            setActiveVideoId(videoId);
+            // Play this video
+            if (videoId && playerRefs.current[videoId]) {
+              playerRefs.current[videoId].playVideo();
+            }
+          } else {
+            const videoId = entry.target.getAttribute('data-video-id');
+            // Pause others
+            if (videoId && playerRefs.current[videoId]) {
+              playerRefs.current[videoId].pauseVideo();
+            }
+          }
+        });
+      },
+      { threshold: 0.8 }
+    );
+
+    const sections = document.querySelectorAll('section[data-video-id]');
+    sections.forEach((section) => observer.observe(section));
+
+    return () => observer.disconnect();
+  }, [feed]);
 
   const fetchVideos = async () => {
     setError(null);
@@ -124,7 +158,7 @@ export function VideoFeed() {
       // Single Tap (Play/Pause)
       const player = playerRefs.current[videoId];
       if (player) {
-        const state = await player.getPlayerState();
+        const state = player.getPlayerState();
         if (state === 1) { // playing
           player.pauseVideo();
           setShowInteractionIcon('pause');
@@ -140,6 +174,12 @@ export function VideoFeed() {
 
   const onPlayerReady = (event: any, id: string) => {
     playerRefs.current[id] = event.target;
+    // If it's the active one, play it
+    if (id === activeVideoId) {
+      event.target.playVideo();
+    } else {
+      event.target.pauseVideo();
+    }
   };
 
   const handleLike = async (videoId: string, currentLikes: number) => {
@@ -150,6 +190,11 @@ export function VideoFeed() {
 
     const userId = user.$id || user.uid;
     const isLiked = likedVideos.includes(videoId);
+
+    // Optimistic UI
+    const nextLikesCount = isLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1;
+    setLikedVideos(prev => isLiked ? prev.filter(id => id !== videoId) : [...prev, videoId]);
+    setFeed(prev => prev.map(v => v.$id === videoId ? { ...v, likesCount: nextLikesCount } : v));
 
     try {
       if (isLiked) {
@@ -163,29 +208,24 @@ export function VideoFeed() {
           await databases.deleteDocument(DATABASE_ID, LIKES_COLLECTION_ID, existingLikes.documents[0].$id);
         }
 
-        const newLikesCount = Math.max(0, currentLikes - 1);
         await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId, {
-          likesCount: newLikesCount
+          likesCount: nextLikesCount
         });
-
-        setLikedVideos(prev => prev.filter(id => id !== videoId));
-        setFeed(prev => prev.map(v => v.$id === videoId ? { ...v, likesCount: newLikesCount } : v));
       } else {
         await databases.createDocument(DATABASE_ID, LIKES_COLLECTION_ID, ID.unique(), {
           userId: userId,
           videoId: videoId
         });
 
-        const newLikesCount = currentLikes + 1;
         await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId, {
-          likesCount: newLikesCount
+          likesCount: nextLikesCount
         });
-
-        setLikedVideos(prev => [...prev, videoId]);
-        setFeed(prev => prev.map(v => v.$id === videoId ? { ...v, likesCount: newLikesCount } : v));
       }
     } catch (error) {
       console.error('Like error:', error);
+      // Revert on error
+      setLikedVideos(prev => isLiked ? [...prev, videoId] : prev.filter(id => id !== videoId));
+      setFeed(prev => prev.map(v => v.$id === videoId ? { ...v, likesCount: currentLikes } : v));
     }
   };
 
@@ -272,14 +312,18 @@ export function VideoFeed() {
   }
 
   return (
-    <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar relative">
-      <div className="fixed top-0 left-0 w-full z-[100] p-6 flex items-center justify-between pointer-events-none bg-gradient-to-b from-black/80 to-transparent">
-        <div className="pointer-events-auto">
+    <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar relative" ref={feedRef}>
+      {/* Top Navigation */}
+      <div className="fixed top-0 left-0 w-full z-[100] p-4 flex items-center justify-between bg-black/80 backdrop-blur-md border-b border-white/5 shadow-lg">
+        <div className="flex items-center gap-2">
           <h1 className="text-2xl font-headline font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
             Relox
           </h1>
         </div>
-        <div className="pointer-events-auto p-2 bg-black/20 backdrop-blur-md rounded-full border border-white/10 cursor-pointer hover:bg-white/10 transition-colors">
+        <div 
+          onClick={() => router.push('/discover')}
+          className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 cursor-pointer transition-all active:scale-95"
+        >
           <Search className="w-5 h-5 text-white" />
         </div>
       </div>
@@ -304,14 +348,18 @@ export function VideoFeed() {
         const isFollowed = followedUsers.includes(item.uploaderUid);
 
         return (
-          <section key={item.$id} className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden">
+          <section 
+            key={item.$id} 
+            data-video-id={item.$id}
+            className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden"
+          >
             <div className="absolute inset-0 w-full h-full pointer-events-none">
               <YouTube
                 videoId={item.youtubeId}
                 opts={{
                   height: "100%",
                   width: "100%",
-                  playerVars: { autoplay: 1, controls: 0, modestbranding: 1, loop: 1, rel: 0, playsinline: 1, mute: 0 },
+                  playerVars: { autoplay: 0, controls: 0, modestbranding: 1, loop: 1, rel: 0, playsinline: 1, mute: 0 },
                 }}
                 onReady={(e) => onPlayerReady(e, item.$id)}
                 className="w-full h-full"
@@ -332,21 +380,21 @@ export function VideoFeed() {
               </div>
             )}
 
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 pointer-events-none z-10" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/90 pointer-events-none z-10" />
 
             <div className="absolute bottom-24 left-4 right-20 flex flex-col gap-3 z-30 animate-in slide-in-from-left-4 duration-500 pointer-events-none">
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <span 
-                    className="text-primary font-bold text-sm tracking-widest drop-shadow-md cursor-pointer pointer-events-auto hover:underline"
-                    onClick={() => alert(`Redirecting to ${item.uploaderUid}'s profile...`)}
+                  <Link 
+                    href={`/profile?id=${item.uploaderUid}`}
+                    className="text-primary font-bold text-sm tracking-widest drop-shadow-md pointer-events-auto hover:underline"
                   >
                     {profile?.username || `@creator_${item.uploaderUid.slice(-4)}`}
-                  </span>
+                  </Link>
                   {!isOwner && !isFollowed && (
                     <button 
                       onClick={() => handleFollow(item.uploaderUid)} 
-                      className="pointer-events-auto bg-primary/20 hover:bg-primary/40 text-primary border border-primary/50 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full backdrop-blur-sm transition-all"
+                      className="pointer-events-auto bg-primary text-black text-[10px] font-bold uppercase px-3 py-1 rounded-full shadow-lg transition-all active:scale-95"
                     >
                       Follow
                     </button>
@@ -368,39 +416,38 @@ export function VideoFeed() {
 
             <div className="absolute bottom-24 right-4 flex flex-col items-center gap-6 z-30">
               <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90 relative">
-                <div className="p-0.5 rounded-full bg-gradient-to-tr from-primary to-secondary p-0.5 shadow-lg">
-                  <div className="bg-black rounded-full overflow-hidden w-10 h-10 border border-black">
+                <Link href={`/profile?id=${item.uploaderUid}`} className="p-0.5 rounded-full bg-gradient-to-tr from-primary to-secondary p-0.5 shadow-lg">
+                  <div className="bg-black rounded-full overflow-hidden w-12 h-12 border border-black">
                     <img 
                       src={profile?.photoURL || `https://ui-avatars.com/api/?name=${item.uploaderUid}&background=33F0FF&color=000`} 
                       className="w-full h-full object-cover" 
                       alt="Avatar" 
-                      onClick={() => alert(`Redirecting to ${item.uploaderUid}'s profile...`)}
                     />
                   </div>
-                </div>
+                </Link>
                 {!isFollowed && !isOwner && (
-                  <button onClick={() => handleFollow(item.uploaderUid)} className="absolute -bottom-2 bg-primary rounded-full p-0.5 border-2 border-black hover:scale-110 transition-transform">
-                    <PlusCircle className="w-4 h-4 text-black" />
+                  <button onClick={() => handleFollow(item.uploaderUid)} className="absolute -bottom-2 bg-primary rounded-full p-0.5 border-2 border-black hover:scale-110 transition-transform shadow-lg">
+                    <PlusCircle className="w-5 h-5 text-black" />
                   </button>
                 )}
               </div>
 
               <div onClick={() => handleLike(item.$id, item.likesCount || 0)} className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
-                <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
+                <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors shadow-lg">
                   <Heart className={cn("w-7 h-7 transition-all duration-300", likedVideos.includes(item.$id) ? "text-primary fill-primary scale-110 drop-shadow-[0_0_8px_rgba(51,240,255,0.6)]" : "text-white")} />
                 </div>
                 <span className="text-[10px] font-bold text-white drop-shadow-md">{item.likesCount || 0}</span>
               </div>
 
               <div onClick={() => setSelectedVideoForComments(item.$id)} className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
-                <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
+                <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors shadow-lg">
                   <MessageCircle className="w-7 h-7 text-white" />
                 </div>
                 <span className="text-[10px] font-bold text-white drop-shadow-md">{item.commentsCount || 0}</span>
               </div>
 
               <div onClick={() => handleShare(item)} className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
-                <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
+                <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors shadow-lg">
                   <Forward className="w-7 h-7 text-white" />
                 </div>
                 <span className="text-[10px] font-bold text-white drop-shadow-md">{item.sharesCount || 0}</span>
@@ -409,7 +456,7 @@ export function VideoFeed() {
               {isOwner && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="p-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors pointer-events-auto">
+                    <button className="p-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors pointer-events-auto shadow-lg">
                       <MoreVertical className="w-5 h-5 text-white/50" />
                     </button>
                   </DropdownMenuTrigger>
