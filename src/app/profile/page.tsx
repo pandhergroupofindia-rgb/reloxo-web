@@ -77,6 +77,7 @@ export default function ProfilePage() {
           </p>
         </div>
 
+        {/* Stats */}
         <div className="flex gap-10 py-4 w-full justify-center">
           <div className="text-center group cursor-pointer">
             <p className="font-bold text-xl group-hover:text-primary transition-colors">0</p>
@@ -94,6 +95,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Actions */}
         <div className="flex gap-3 w-full px-4">
           <Button variant="outline" className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px]">
             Edit Vibe
@@ -104,6 +106,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* Profile Content */}
       <Tabs defaultValue="videos" className="w-full flex-1 flex flex-col">
         <TabsList className="w-full bg-black border-b border-white/5 rounded-none p-0 h-14">
           <TabsTrigger value="videos" className="flex-1 rounded-none data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary transition-all">

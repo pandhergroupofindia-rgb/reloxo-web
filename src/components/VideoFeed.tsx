@@ -6,8 +6,10 @@ import { Heart, MessageCircle, Forward, CircleUser, Music2 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { databases, DATABASE_ID, Query } from "@/lib/appwrite";
+import { ID } from "appwrite";
 
 const VIDEOS_COLLECTION_ID = 'videos';
+const LIKES_COLLECTION_ID = 'likes';
 
 export function VideoFeed() {
   const { user, openLoginModal } = useAuth();
@@ -21,18 +23,37 @@ export function VideoFeed() {
     fetchVideos();
   }, []);
 
+  useEffect(() => {
+    if (user && videos.length > 0) {
+      fetchUserLikes();
+    }
+  }, [user, videos]);
+
   const fetchVideos = async () => {
     try {
       const response = await databases.listDocuments(
         DATABASE_ID,
         VIDEOS_COLLECTION_ID,
-        [Query.orderDesc('$createdAt'), Query.limit(10)]
+        [Query.orderDesc('$createdAt'), Query.limit(20)]
       );
       setVideos(response.documents);
     } catch (error) {
       console.error('Error fetching videos:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserLikes = async () => {
+    try {
+      const response = await databases.listDocuments(
+        DATABASE_ID,
+        LIKES_COLLECTION_ID,
+        [Query.equal('userId', user.$id || user.uid)]
+      );
+      setLikedVideos(response.documents.map((doc: any) => doc.videoId));
+    } catch (error) {
+      console.error('Error fetching user likes:', error);
     }
   };
 
@@ -55,18 +76,51 @@ export function VideoFeed() {
     },
   };
 
-  const handleInteraction = (videoId: string, type: 'like' | 'comment' | 'share' | 'profile') => {
+  const handleLike = async (videoId: string, currentLikes: number) => {
     if (!user) {
       openLoginModal();
       return;
     }
 
-    if (type === 'like') {
-      setLikedVideos(prev => 
-        prev.includes(videoId) 
-          ? prev.filter(id => id !== videoId) 
-          : [...prev, videoId]
-      );
+    const isLiked = likedVideos.includes(videoId);
+
+    try {
+      if (isLiked) {
+        // Unlike logic
+        const existingLikes = await databases.listDocuments(
+          DATABASE_ID,
+          LIKES_COLLECTION_ID,
+          [Query.equal('userId', user.$id || user.uid), Query.equal('videoId', videoId)]
+        );
+        
+        if (existingLikes.total > 0) {
+          await databases.deleteDocument(DATABASE_ID, LIKES_COLLECTION_ID, existingLikes.documents[0].$id);
+        }
+
+        const newLikesCount = Math.max(0, currentLikes - 1);
+        await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId, {
+          likesCount: newLikesCount
+        });
+
+        setLikedVideos(prev => prev.filter(id => id !== videoId));
+        setVideos(prev => prev.map(v => v.$id === videoId ? { ...v, likesCount: newLikesCount } : v));
+      } else {
+        // Like logic
+        await databases.createDocument(DATABASE_ID, LIKES_COLLECTION_ID, ID.unique(), {
+          userId: user.$id || user.uid,
+          videoId: videoId
+        });
+
+        const newLikesCount = currentLikes + 1;
+        await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId, {
+          likesCount: newLikesCount
+        });
+
+        setLikedVideos(prev => [...prev, videoId]);
+        setVideos(prev => prev.map(v => v.$id === videoId ? { ...v, likesCount: newLikesCount } : v));
+      }
+    } catch (error) {
+      console.error('Like error:', error);
     }
   };
 
@@ -100,6 +154,7 @@ export function VideoFeed() {
           key={video.$id}
           className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden"
         >
+          {/* YouTube Background */}
           <div className="absolute inset-0 w-full h-full pointer-events-none">
             <YouTube
               videoId={video.youtubeId}
@@ -110,8 +165,10 @@ export function VideoFeed() {
             />
           </div>
 
+          {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 pointer-events-none" />
 
+          {/* Video Metadata Overlay */}
           <div className="absolute bottom-24 left-4 right-20 flex flex-col gap-3 z-10 animate-in slide-in-from-left-4 duration-500">
             <div className="flex items-center gap-2">
               <h3 className="font-headline font-bold text-white text-lg neon-text">
@@ -132,11 +189,10 @@ export function VideoFeed() {
             </div>
           </div>
 
+          {/* Action Buttons */}
           <div className="absolute bottom-24 right-4 flex flex-col items-center gap-6 z-10">
-            <div 
-              onClick={() => handleInteraction(video.$id, 'profile')}
-              className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
-            >
+            {/* Profile */}
+            <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
               <div className="p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 relative">
                 <CircleUser className="w-10 h-10 text-white" />
                 <div className="absolute -bottom-1 -right-1 bg-primary text-black rounded-full p-0.5 border-2 border-black">
@@ -145,8 +201,9 @@ export function VideoFeed() {
               </div>
             </div>
 
+            {/* Like */}
             <div 
-              onClick={() => handleInteraction(video.$id, 'like')}
+              onClick={() => handleLike(video.$id, video.likesCount || 0)}
               className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
             >
               <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
@@ -156,28 +213,24 @@ export function VideoFeed() {
                 )} />
               </div>
               <span className="text-[10px] font-bold text-white drop-shadow-md">
-                {likedVideos.includes(video.$id) ? (video.likesCount || 0) + 1 : (video.likesCount || 0)}
+                {video.likesCount || 0}
               </span>
             </div>
 
-            <div 
-              onClick={() => handleInteraction(video.$id, 'comment')}
-              className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
-            >
+            {/* Comment */}
+            <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
               <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
                 <MessageCircle className="w-7 h-7 text-white" />
               </div>
-              <span className="text-[10px] font-bold text-white drop-shadow-md">0</span>
+              <span className="text-[10px] font-bold text-white drop-shadow-md">{video.commentsCount || 0}</span>
             </div>
 
-            <div 
-              onClick={() => handleInteraction(video.$id, 'share')}
-              className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
-            >
+            {/* Share */}
+            <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
               <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
                 <Forward className="w-7 h-7 text-white" />
               </div>
-              <span className="text-[10px] font-bold text-white drop-shadow-md">Share</span>
+              <span className="text-[10px] font-bold text-white drop-shadow-md">{video.sharesCount || 'Share'}</span>
             </div>
           </div>
         </section>

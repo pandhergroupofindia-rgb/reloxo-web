@@ -115,12 +115,15 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
           visibility: visibility,
           uploaderUid: user.$id || user.uid,
           likesCount: 0,
+          commentsCount: 0,
+          sharesCount: 0
         }
       );
 
       setUploadStatus('success');
       setTimeout(() => {
         onClose();
+        window.location.reload();
       }, 2000);
     } catch (err: any) {
       console.error(err);
