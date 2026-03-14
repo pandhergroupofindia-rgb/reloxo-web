@@ -37,8 +37,12 @@ export function VideoFeed() {
         [Query.orderDesc('$createdAt'), Query.limit(20)]
       );
       setVideos(response.documents);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching videos:', error);
+      // Detailed logging for Appwrite errors
+      if (error.message === 'Failed to fetch') {
+        console.warn('Network error: Ensure your domain is added to Appwrite Platforms and no ad-blockers are interfering.');
+      }
     } finally {
       setLoading(false);
     }
@@ -46,10 +50,11 @@ export function VideoFeed() {
 
   const fetchUserLikes = async () => {
     try {
+      const userId = user.$id || user.uid;
       const response = await databases.listDocuments(
         DATABASE_ID,
         LIKES_COLLECTION_ID,
-        [Query.equal('userId', user.$id || user.uid)]
+        [Query.equal('userId', userId)]
       );
       setLikedVideos(response.documents.map((doc: any) => doc.videoId));
     } catch (error) {
@@ -58,6 +63,7 @@ export function VideoFeed() {
   };
 
   const onPlayerReady: YouTubeProps["onReady"] = (event) => {
+    // Attempt to play, noting browser autoplay policies might block it
     event.target.playVideo();
   };
 
@@ -82,6 +88,7 @@ export function VideoFeed() {
       return;
     }
 
+    const userId = user.$id || user.uid;
     const isLiked = likedVideos.includes(videoId);
 
     try {
@@ -90,7 +97,7 @@ export function VideoFeed() {
         const existingLikes = await databases.listDocuments(
           DATABASE_ID,
           LIKES_COLLECTION_ID,
-          [Query.equal('userId', user.$id || user.uid), Query.equal('videoId', videoId)]
+          [Query.equal('userId', userId), Query.equal('videoId', videoId)]
         );
         
         if (existingLikes.total > 0) {
@@ -107,7 +114,7 @@ export function VideoFeed() {
       } else {
         // Like logic
         await databases.createDocument(DATABASE_ID, LIKES_COLLECTION_ID, ID.unique(), {
-          userId: user.$id || user.uid,
+          userId: userId,
           videoId: videoId
         });
 
