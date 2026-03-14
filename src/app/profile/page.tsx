@@ -1,10 +1,11 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Grid, Heart, Bookmark, LogOut, Settings, Play, X, Shield, FileText, ChevronRight, MessageSquare } from 'lucide-react';
+import { Grid, Heart, Bookmark, LogOut, Settings, Play, Shield, FileText, ChevronRight, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { databases, DATABASE_ID, Query } from '@/lib/appwrite';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -13,7 +14,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 const VIDEOS_COLLECTION_ID = 'videos';
 
-export default function ProfilePage() {
+function ProfileContent() {
   const { user, logout, loading } = useAuth();
   const [userVideos, setUserVideos] = useState<any[]>([]);
   const [fetchingVideos, setFetchingVideos] = useState(true);
@@ -80,7 +81,10 @@ export default function ProfilePage() {
         </div>
         
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-headline font-bold neon-text">{user?.displayName || user?.name}</h1>
+          <div className="flex items-center justify-center gap-1.5">
+            <h1 className="text-2xl font-headline font-bold neon-text">{user?.displayName || user?.name}</h1>
+            {user?.isVerified && <CheckCircle2 className="w-4 h-4 text-primary fill-primary/20" />}
+          </div>
           <p className="text-primary text-sm font-bold tracking-widest">{user?.username || '@viber'}</p>
           <p className="text-muted-foreground text-xs max-w-[250px] mt-2 line-clamp-2 italic">
             {user?.bio || 'Setting the stage for the next big vibe. ⚡'}
@@ -201,7 +205,7 @@ export default function ProfilePage() {
           ) : userVideos.length > 0 ? (
             <div className="grid grid-cols-3 gap-0.5">
               {userVideos.map((video) => (
-                <div key={video.$id} className="relative aspect-[3/4] bg-zinc-900 overflow-hidden group">
+                <div key={video.$id} className="relative aspect-[3/4] bg-zinc-900 overflow-hidden group cursor-pointer" onClick={() => router.push(`/?v=${video.youtubeId}`)}>
                   <Image 
                     src={`https://img.youtube.com/vi/${video.youtubeId}/0.jpg`}
                     alt={video.title}
@@ -241,5 +245,18 @@ export default function ProfilePage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-full bg-black text-white p-6">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-xs uppercase tracking-widest font-bold text-primary animate-pulse">Synchronizing Profile...</p>
+      </div>
+    }>
+      <ProfileContent />
+    </Suspense>
   );
 }
