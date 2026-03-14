@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 const VIDEOS_COLLECTION_ID = 'videos';
+const FOLLOWERS_COLLECTION_ID = 'followers';
 
 function ProfileContent() {
   const { user, logout, loading } = useAuth();
@@ -29,6 +30,8 @@ function ProfileContent() {
   const [isCreatorToolsOpen, setIsCreatorToolsOpen] = useState(false);
   const [editData, setEditData] = useState({ name: '', bio: '' });
   const [isUpdating, setIsUpdating] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const router = useRouter();
   const searchParams = useSearchParams();
   const viewingOtherUserId = searchParams.get('id');
@@ -62,10 +65,31 @@ function ProfileContent() {
     const targetId = viewingOtherUserId || user?.$id || user?.uid;
     if (targetId) {
       fetchUserVideos(targetId);
+      fetchFollowCounts(targetId);
     } else if (!loading && !viewingOtherUserId) {
       setFetchingVideos(false);
     }
   }, [user, viewingOtherUserId, loading]);
+
+  const fetchFollowCounts = async (targetId: string) => {
+    try {
+      const followers = await databases.listDocuments(
+        DATABASE_ID,
+        FOLLOWERS_COLLECTION_ID,
+        [Query.equal('followingId', targetId)]
+      );
+      setFollowersCount(followers.total);
+
+      const following = await databases.listDocuments(
+        DATABASE_ID,
+        FOLLOWERS_COLLECTION_ID,
+        [Query.equal('followerId', targetId)]
+      );
+      setFollowingCount(following.total);
+    } catch (error) {
+      console.error('Error fetching follow counts:', error);
+    }
+  };
 
   const fetchUserVideos = async (targetId: string) => {
     try {
@@ -158,11 +182,11 @@ function ProfileContent() {
 
         <div className="flex gap-10 py-4 w-full justify-center">
           <div className="text-center">
-            <p className="font-bold text-xl">0</p>
+            <p className="font-bold text-xl">{followingCount}</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold">Following</p>
           </div>
           <div className="text-center border-x border-white/10 px-10">
-            <p className="font-bold text-xl">0</p>
+            <p className="font-bold text-xl">{followersCount}</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold">Followers</p>
           </div>
           <div className="text-center">
