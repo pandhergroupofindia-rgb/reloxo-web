@@ -318,7 +318,7 @@ function ProfileContent() {
               {userVideos.map((video) => (
                 <div key={video?.$id} className="relative aspect-[3/4] bg-zinc-900 overflow-hidden group cursor-pointer" onClick={() => router.push(`/?v=${video?.youtubeId}`)}>
                   <Image 
-                    src={video?.thumbnailUrl || `https://img.youtube.com/vi/${video?.youtubeId}/0.jpg`}
+                    src={video?.thumbnailUrl || `https://img.youtube.com/vi/${video?.youtubeId}/hqdefault.jpg`}
                     alt={video?.title || "Vibe"}
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-500"

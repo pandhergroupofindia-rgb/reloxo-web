@@ -90,7 +90,7 @@ export default function DiscoverPage() {
                   onClick={() => router.push(`/?v=${video.youtubeId}`)}
                 >
                   <Image 
-                    src={video.thumbnailUrl || `https://img.youtube.com/vi/${video.youtubeId}/0.jpg`}
+                    src={video.thumbnailUrl || `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`}
                     alt={video.title}
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
