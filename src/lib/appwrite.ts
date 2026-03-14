@@ -1,4 +1,4 @@
-import { Client, Account, Databases } from 'appwrite';
+import { Client, Account, Databases, Query } from 'appwrite';
 
 const client = new Client()
     .setEndpoint('https://sgp.cloud.appwrite.io/v1')
@@ -6,7 +6,7 @@ const client = new Client()
 
 export const account = new Account(client);
 export const databases = new Databases(client);
-export { client };
+export { client, Query };
 
 export const DATABASE_ID = '69b3778a0006292b8708';
 export const COLLECTION_ID = 'users';

@@ -1,47 +1,40 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
 import YouTube, { YouTubeProps } from "react-youtube";
-import { Heart, MessageCircle, Forward, CircleUser } from "lucide-react";
+import { Heart, MessageCircle, Forward, CircleUser, Music2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
+import { databases, DATABASE_ID, Query } from "@/lib/appwrite";
 
-const DUMMY_VIDEOS = [
-  {
-    id: "7aA18NqA6K0",
-    creator: "@neon_vibe",
-    caption: "Mumbai nights hitting different 🚀 #reloxo #future #vibes",
-    likes: "12.4k",
-    comments: "842",
-    shares: "1.2k",
-  },
-  {
-    id: "M5O8r_R4oYo",
-    creator: "@tech_india",
-    caption: "The future of AI is happening now in Bangalore! 🤖🇮🇳 #innovation #tech",
-    likes: "45.1k",
-    comments: "2.1k",
-    shares: "5.6k",
-  },
-  {
-    id: "Xf7_WvW0JtA",
-    creator: "@dance_crew_official",
-    caption: "New routine unlocked! Can you keep up? 🔥🕺 #dance #challenge",
-    likes: "8.9k",
-    comments: "450",
-    shares: "890",
-  },
-];
+const VIDEOS_COLLECTION_ID = 'videos';
 
 export function VideoFeed() {
   const { user, openLoginModal } = useAuth();
+  const [videos, setVideos] = useState<any[]>([]);
   const [likedVideos, setLikedVideos] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
+    fetchVideos();
   }, []);
+
+  const fetchVideos = async () => {
+    try {
+      const response = await databases.listDocuments(
+        DATABASE_ID,
+        VIDEOS_COLLECTION_ID,
+        [Query.orderDesc('$createdAt'), Query.limit(10)]
+      );
+      setVideos(response.documents);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onPlayerReady: YouTubeProps["onReady"] = (event) => {
     event.target.playVideo();
@@ -58,7 +51,7 @@ export function VideoFeed() {
       rel: 0,
       playsinline: 1,
       disablekb: 1,
-      mute: 1,
+      mute: 0,
     },
   };
 
@@ -79,17 +72,37 @@ export function VideoFeed() {
 
   if (!isMounted) return <div className="h-full w-full bg-black" />;
 
+  if (loading) {
+    return (
+      <div className="h-full w-full bg-black flex flex-col items-center justify-center gap-4">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-primary font-medium tracking-widest text-xs uppercase animate-pulse">Syncing Vibes...</p>
+      </div>
+    );
+  }
+
+  if (videos.length === 0) {
+    return (
+      <div className="h-full w-full bg-black flex flex-col items-center justify-center p-8 text-center gap-4">
+        <div className="p-4 rounded-full bg-white/5 border border-white/10">
+          <Music2 className="w-12 h-12 text-primary opacity-50" />
+        </div>
+        <h2 className="text-xl font-headline font-bold text-white neon-text">No Vibes Yet</h2>
+        <p className="text-muted-foreground text-sm">Be the first to upload a masterpiece and set the stage!</p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar">
-      {DUMMY_VIDEOS.map((video) => (
+      {videos.map((video) => (
         <section
-          key={video.id}
+          key={video.$id}
           className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden"
         >
-          {/* YouTube Player */}
           <div className="absolute inset-0 w-full h-full pointer-events-none">
             <YouTube
-              videoId={video.id}
+              videoId={video.youtubeId}
               opts={opts}
               onReady={onPlayerReady}
               className="w-full h-full"
@@ -97,62 +110,74 @@ export function VideoFeed() {
             />
           </div>
 
-          {/* Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/60 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 pointer-events-none" />
 
-          {/* Creator & Caption */}
-          <div className="absolute bottom-6 left-4 right-16 flex flex-col gap-2 z-10">
-            <h3 className="font-headline font-bold text-white text-lg neon-text">
-              {video.creator}
-            </h3>
-            <p className="text-white text-sm leading-snug drop-shadow-md">
+          <div className="absolute bottom-24 left-4 right-20 flex flex-col gap-3 z-10 animate-in slide-in-from-left-4 duration-500">
+            <div className="flex items-center gap-2">
+              <h3 className="font-headline font-bold text-white text-lg neon-text">
+                {video.title || 'Untitled Vibe'}
+              </h3>
+              <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider border border-primary/30">
+                {video.category || 'General'}
+              </span>
+            </div>
+            <p className="text-white/90 text-sm leading-snug line-clamp-2 drop-shadow-md">
               {video.caption}
             </p>
+            <div className="flex items-center gap-2 text-primary">
+              <Music2 className="w-3 h-3" />
+              <span className="text-[10px] font-medium animate-marquee whitespace-nowrap overflow-hidden">
+                Original Vibe • {video.title}
+              </span>
+            </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="absolute bottom-6 right-4 flex flex-col items-center gap-6 z-10">
+          <div className="absolute bottom-24 right-4 flex flex-col items-center gap-6 z-10">
             <div 
-              onClick={() => handleInteraction(video.id, 'profile')}
+              onClick={() => handleInteraction(video.$id, 'profile')}
               className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
             >
-              <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
-                <CircleUser className="w-8 h-8 text-white" />
+              <div className="p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 relative">
+                <CircleUser className="w-10 h-10 text-white" />
+                <div className="absolute -bottom-1 -right-1 bg-primary text-black rounded-full p-0.5 border-2 border-black">
+                  <Forward className="w-2 h-2 rotate-90" />
+                </div>
               </div>
-              <span className="text-[10px] font-bold text-white">Profile</span>
             </div>
 
             <div 
-              onClick={() => handleInteraction(video.id, 'like')}
+              onClick={() => handleInteraction(video.$id, 'like')}
               className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
             >
-              <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+              <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
                 <Heart className={cn(
-                  "w-8 h-8 transition-colors",
-                  likedVideos.includes(video.id) ? "text-primary fill-primary neon-text" : "text-white group-hover:text-primary"
+                  "w-7 h-7 transition-all duration-300",
+                  likedVideos.includes(video.$id) ? "text-primary fill-primary scale-110 drop-shadow-[0_0_8px_rgba(51,240,255,0.6)]" : "text-white"
                 )} />
               </div>
-              <span className="text-[10px] font-bold text-white">{video.likes}</span>
+              <span className="text-[10px] font-bold text-white drop-shadow-md">
+                {likedVideos.includes(video.$id) ? (video.likesCount || 0) + 1 : (video.likesCount || 0)}
+              </span>
             </div>
 
             <div 
-              onClick={() => handleInteraction(video.id, 'comment')}
+              onClick={() => handleInteraction(video.$id, 'comment')}
               className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
             >
-              <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
-                <MessageCircle className="w-8 h-8 text-white" />
+              <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
+                <MessageCircle className="w-7 h-7 text-white" />
               </div>
-              <span className="text-[10px] font-bold text-white">{video.comments}</span>
+              <span className="text-[10px] font-bold text-white drop-shadow-md">0</span>
             </div>
 
             <div 
-              onClick={() => handleInteraction(video.id, 'share')}
+              onClick={() => handleInteraction(video.$id, 'share')}
               className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
             >
-              <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
-                <Forward className="w-8 h-8 text-white" />
+              <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
+                <Forward className="w-7 h-7 text-white" />
               </div>
-              <span className="text-[10px] font-bold text-white">{video.shares}</span>
+              <span className="text-[10px] font-bold text-white drop-shadow-md">Share</span>
             </div>
           </div>
         </section>

@@ -33,14 +33,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const checkSession = async () => {
     try {
       const currentAccount = await account.get();
-      try {
-        const profileDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, currentAccount.$id);
-        const profile = JSON.parse(profileDoc.profileData || '{}');
-        setUser({ ...currentAccount, ...profile });
-      } catch (e) {
-        // Document doesn't exist, trigger onboarding
-        setTempUser(currentAccount);
-        setIsOnboardingOpen(true);
+      if (currentAccount) {
+        try {
+          const profileDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, currentAccount.$id);
+          const profile = JSON.parse(profileDoc.profileData || '{}');
+          setUser({ ...currentAccount, ...profile });
+        } catch (e) {
+          // No profile yet, trigger onboarding if it's a new session
+          setTempUser(currentAccount);
+          setIsOnboardingOpen(true);
+        }
       }
     } catch (error) {
       setUser(null);
@@ -57,7 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         window.location.origin
       );
     } catch (error: any) {
-      alert('Login Error: ' + error.message);
+      console.error('Login Error:', error.message);
     }
   };
 
@@ -68,11 +70,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         uid: tempUser.$id,
         email: tempUser.email,
         displayName: tempUser.name,
-        username: username || `@user_${tempUser.$id.substring(0, 5)}`,
+        username: username.startsWith('@') ? username : `@${username}`,
         bio: bio || '',
         walletBalance: 0,
         isVerified: false,
         role: 'user',
+        photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(tempUser.name)}&background=33F0FF&color=000`,
       };
 
       await databases.createDocument(
@@ -85,9 +88,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser({ ...tempUser, ...profile });
       setIsOnboardingOpen(false);
       setTempUser(null);
-      alert('Profile Created Successfully! 🎉');
     } catch (error: any) {
-      alert('Profile Save Error: ' + error.message);
+      console.error('Onboarding Error:', error.message);
     }
   };
 
@@ -95,9 +97,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await account.deleteSession('current');
       setUser(null);
-      window.location.reload();
+      window.location.href = '/';
     } catch (error: any) {
-      alert('Logout Error: ' + error.message);
+      console.error('Logout Error:', error.message);
     }
   };
 
