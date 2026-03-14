@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Send, MessageCircle } from 'lucide-react';
+import { X, Send, MessageCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
-import { databases, DATABASE_ID, Query } from '@/lib/appwrite';
-import { ID } from 'appwrite';
+import { databases, DATABASE_ID } from '@/lib/appwrite';
+import { ID, Query } from 'appwrite';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
 
 interface CommentsModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ const VIDEOS_COLLECTION_ID = 'videos';
 
 export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) {
   const { user, openLoginModal } = useAuth();
+  const { toast } = useToast();
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -41,12 +43,17 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
         [
           Query.equal('videoId', videoId),
           Query.orderDesc('$createdAt'),
-          Query.limit(50)
+          Query.limit(100)
         ]
       );
       setComments(response.documents);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching comments:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fetch Error',
+        description: error.message || 'Could not load comments.',
+      });
     } finally {
       setFetching(false);
     }
@@ -70,7 +77,6 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
         userPhoto: user.photoURL || ''
       };
 
-      // Create comment document
       await databases.createDocument(
         DATABASE_ID,
         COMMENTS_COLLECTION_ID,
@@ -78,19 +84,23 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
         commentData
       );
 
-      // Increment commentsCount in video document
-      const videoDoc = await databases.getDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId);
-      await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId, {
-        commentsCount: (videoDoc.commentsCount || 0) + 1
-      });
+      // Try to update the count on the video
+      try {
+        const videoDoc = await databases.getDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId);
+        await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, videoId, {
+          commentsCount: (videoDoc.commentsCount || 0) + 1
+        });
+      } catch (countError) {
+        console.warn('Could not update comment count on video document', countError);
+      }
 
       setNewComment('');
-      fetchComments();
-    } catch (error) {
+      await fetchComments();
+    } catch (error: any) {
       console.error('Error sending comment:', error);
+      alert('Error posting comment: ' + error.message);
     } finally {
-      setIsLoading(true); // Small delay feel
-      setTimeout(() => setIsLoading(false), 500);
+      setIsLoading(false);
     }
   };
 
@@ -104,7 +114,7 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
         <header className="p-4 border-b border-white/5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MessageCircle className="w-4 h-4 text-primary" />
-            <span className="text-sm font-bold uppercase tracking-widest text-white">Comments</span>
+            <span className="text-sm font-bold uppercase tracking-widest text-white">Comments ({comments.length})</span>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="text-white/50 hover:text-white hover:bg-white/5 rounded-full">
             <X className="w-5 h-5" />
@@ -139,7 +149,7 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
           ) : (
             <div className="h-full flex flex-col items-center justify-center opacity-30 gap-4 py-20">
               <MessageCircle className="w-12 h-12" />
-              <p className="text-xs font-bold uppercase tracking-[0.2em]">Be the first to vibe</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em]">No comments yet</p>
             </div>
           )}
         </ScrollArea>
@@ -159,7 +169,7 @@ export function CommentsModal({ isOpen, onClose, videoId }: CommentsModalProps) 
               disabled={!newComment.trim() || isLoading}
               className="rounded-full bg-primary text-black hover:bg-primary/90 w-10 h-10"
             >
-              <Send className="w-4 h-4" />
+              {isLoading ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
             </Button>
           </form>
         </div>

@@ -1,26 +1,39 @@
-
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Grid, Heart, Bookmark, LogOut, Settings, Play, Shield, FileText, ChevronRight, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { Grid, Heart, Bookmark, LogOut, Settings, Play, Shield, FileText, ChevronRight, MessageSquare, CheckCircle2, User, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { databases, DATABASE_ID, Query } from '@/lib/appwrite';
+import { databases, DATABASE_ID, Query, COLLECTION_ID } from '@/lib/appwrite';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 
 const VIDEOS_COLLECTION_ID = 'videos';
 
 function ProfileContent() {
   const { user, logout, loading } = useAuth();
+  const { toast } = useToast();
   const [userVideos, setUserVideos] = useState<any[]>([]);
   const [fetchingVideos, setFetchingVideos] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({ name: '', bio: '' });
+  const [isUpdating, setIsUpdating] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const viewingOtherUserId = searchParams.get('id');
+
+  useEffect(() => {
+    if (user) {
+      setEditData({ name: user.displayName || '', bio: user.bio || '' });
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user?.$id || user?.uid || viewingOtherUserId) {
@@ -46,6 +59,40 @@ function ProfileContent() {
       console.error('Error fetching user videos:', error);
     } finally {
       setFetchingVideos(false);
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!user) return;
+    setIsUpdating(true);
+    try {
+      const currentProfileDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, user.$id);
+      const currentProfile = JSON.parse(currentProfileDoc.profileData || '{}');
+      
+      const updatedProfile = {
+        ...currentProfile,
+        displayName: editData.name,
+        bio: editData.bio
+      };
+
+      await databases.updateDocument(DATABASE_ID, COLLECTION_ID, user.$id, {
+        profileData: JSON.stringify(updatedProfile)
+      });
+
+      toast({
+        title: "Profile Updated ⚡",
+        description: "Your vibes have been refreshed.",
+      });
+      setIsEditing(false);
+      window.location.reload();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Update Failed',
+        description: error.message || 'Could not update profile.',
+      });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -86,7 +133,7 @@ function ProfileContent() {
             {user?.isVerified && <CheckCircle2 className="w-4 h-4 text-primary fill-primary/20" />}
           </div>
           <p className="text-primary text-sm font-bold tracking-widest">{user?.username || '@viber'}</p>
-          <p className="text-muted-foreground text-xs max-w-[250px] mt-2 line-clamp-2 italic">
+          <p className="text-muted-foreground text-xs max-w-[250px] mt-2 line-clamp-2 italic px-4">
             {user?.bio || 'Setting the stage for the next big vibe. ⚡'}
           </p>
         </div>
@@ -113,9 +160,45 @@ function ProfileContent() {
         <div className="flex gap-3 w-full px-4">
           {isOwnProfile ? (
             <>
-              <Button variant="outline" className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px]">
-                Edit Vibe
-              </Button>
+              <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px]">
+                    Edit Vibe
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-zinc-900 border-white/10 text-white rounded-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="neon-text">Update Profile</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase tracking-widest font-bold text-primary">Display Name</label>
+                      <Input 
+                        value={editData.name} 
+                        onChange={(e) => setEditData({...editData, name: e.target.value})} 
+                        className="bg-black/50 border-white/10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase tracking-widest font-bold text-primary">Bio</label>
+                      <Textarea 
+                        value={editData.bio} 
+                        onChange={(e) => setEditData({...editData, bio: e.target.value})} 
+                        className="bg-black/50 border-white/10 resize-none h-24"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button 
+                      onClick={handleUpdateProfile} 
+                      disabled={isUpdating}
+                      className="w-full bg-primary text-black font-bold"
+                    >
+                      {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
               
               <Sheet>
                 <SheetTrigger asChild>
