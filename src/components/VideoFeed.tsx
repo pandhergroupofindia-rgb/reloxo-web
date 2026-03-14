@@ -1,23 +1,31 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import YouTube, { YouTubeProps } from "react-youtube";
-import { Heart, MessageCircle, Forward, CircleUser, Music2, AlertTriangle } from "lucide-react";
+import { Heart, MessageCircle, Forward, CircleUser, Music2, AlertTriangle, PlusCircle, Check } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { databases, DATABASE_ID, Query } from "@/lib/appwrite";
 import { ID } from "appwrite";
+import { CommentsModal } from "./CommentsModal";
+import { useToast } from "@/hooks/use-toast";
 
 const VIDEOS_COLLECTION_ID = 'videos';
 const LIKES_COLLECTION_ID = 'likes';
+const FOLLOWERS_COLLECTION_ID = 'followers';
 
 export function VideoFeed() {
   const { user, openLoginModal } = useAuth();
+  const { toast } = useToast();
   const [videos, setVideos] = useState<any[]>([]);
   const [likedVideos, setLikedVideos] = useState<string[]>([]);
+  const [followedUsers, setFollowedUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  
+  // Interaction States
+  const [selectedVideoForComments, setSelectedVideoForComments] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -27,6 +35,7 @@ export function VideoFeed() {
   useEffect(() => {
     if (user && videos.length > 0) {
       fetchUserLikes();
+      fetchUserFollows();
     }
   }, [user, videos]);
 
@@ -41,12 +50,7 @@ export function VideoFeed() {
       setVideos(response.documents);
     } catch (err: any) {
       console.error('Error fetching videos:', err);
-      if (err.message?.includes('fetch') || err.name === 'TypeError') {
-        const hostname = typeof window !== 'undefined' ? window.location.hostname : 'your domain';
-        setError(`Connection failed. Please ensure "${hostname}" is added as a Web Platform in your Appwrite Project.`);
-      } else {
-        setError(err.message || 'Failed to sync vibes.');
-      }
+      setError(err.message || 'Failed to sync vibes.');
     } finally {
       setLoading(false);
     }
@@ -63,6 +67,20 @@ export function VideoFeed() {
       setLikedVideos(response.documents.map((doc: any) => doc.videoId));
     } catch (error) {
       console.error('Error fetching user likes:', error);
+    }
+  };
+
+  const fetchUserFollows = async () => {
+    try {
+      const userId = user.$id || user.uid;
+      const response = await databases.listDocuments(
+        DATABASE_ID,
+        FOLLOWERS_COLLECTION_ID,
+        [Query.equal('followerId', userId)]
+      );
+      setFollowedUsers(response.documents.map((doc: any) => doc.followingId));
+    } catch (error) {
+      console.error('Error fetching user follows:', error);
     }
   };
 
@@ -132,13 +150,59 @@ export function VideoFeed() {
     }
   };
 
+  const handleFollow = async (uploaderId: string) => {
+    if (!user) {
+      openLoginModal();
+      return;
+    }
+    
+    if (user.$id === uploaderId || followedUsers.includes(uploaderId)) return;
+
+    try {
+      await databases.createDocument(DATABASE_ID, FOLLOWERS_COLLECTION_ID, ID.unique(), {
+        followerId: user.$id || user.uid,
+        followingId: uploaderId
+      });
+      
+      setFollowedUsers(prev => [...prev, uploaderId]);
+      toast({
+        title: "Followed! ⚡",
+        description: "You're now following this creator.",
+      });
+    } catch (error) {
+      console.error('Follow error:', error);
+    }
+  };
+
+  const handleShare = async (video: any) => {
+    try {
+      const shareUrl = `${window.location.origin}/?v=${video.youtubeId}`;
+      await navigator.clipboard.writeText(shareUrl);
+      
+      // Increment share count
+      const newSharesCount = (video.sharesCount || 0) + 1;
+      await databases.updateDocument(DATABASE_ID, VIDEOS_COLLECTION_ID, video.$id, {
+        sharesCount: newSharesCount
+      });
+      
+      setVideos(prev => prev.map(v => v.$id === video.$id ? { ...v, sharesCount: newSharesCount } : v));
+      
+      toast({
+        title: "Link Copied! 🚀",
+        description: "Share the vibe with your friends.",
+      });
+    } catch (error) {
+      console.error('Share error:', error);
+    }
+  };
+
   if (!isMounted) return <div className="h-full w-full bg-black" />;
 
   if (loading) {
     return (
       <div className="h-full w-full bg-black flex flex-col items-center justify-center gap-4">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-primary font-medium tracking-widest text-xs uppercase animate-pulse">Syncing Vibes...</p>
+        <p className="text-primary font-medium tracking-[0.2em] text-xs uppercase animate-pulse">Syncing Vibes...</p>
       </div>
     );
   }
@@ -151,9 +215,7 @@ export function VideoFeed() {
         </div>
         <div className="space-y-2">
           <h2 className="text-xl font-headline font-bold text-white">Sync Failed</h2>
-          <p className="text-muted-foreground text-sm max-w-xs mx-auto">
-            {error}
-          </p>
+          <p className="text-muted-foreground text-sm max-w-xs mx-auto">{error}</p>
         </div>
         <button 
           onClick={fetchVideos}
@@ -209,23 +271,37 @@ export function VideoFeed() {
               {video.caption}
             </p>
             <div className="flex items-center gap-2 text-primary">
-              <Music2 className="w-3 h-3" />
-              <span className="text-[10px] font-medium animate-marquee whitespace-nowrap overflow-hidden">
+              <Music2 className="w-3 h-3 animate-pulse" />
+              <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap overflow-hidden">
                 Original Vibe • {video.title}
               </span>
             </div>
           </div>
 
           <div className="absolute bottom-24 right-4 flex flex-col items-center gap-6 z-10">
-            <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
-              <div className="p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 relative">
-                <CircleUser className="w-10 h-10 text-white" />
-                <div className="absolute -bottom-1 -right-1 bg-primary text-black rounded-full p-0.5 border-2 border-black">
-                  <Forward className="w-2 h-2 rotate-90" />
+            {/* Creator Follow */}
+            <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90 relative">
+              <div className="p-0.5 rounded-full bg-gradient-to-tr from-primary to-secondary p-0.5 shadow-lg">
+                <div className="bg-black rounded-full p-0.5">
+                  <CircleUser className="w-10 h-10 text-white" />
                 </div>
               </div>
+              {!followedUsers.includes(video.uploaderUid) && video.uploaderUid !== user?.$id && (
+                <button 
+                  onClick={() => handleFollow(video.uploaderUid)}
+                  className="absolute -bottom-2 bg-primary rounded-full p-0.5 border-2 border-black hover:scale-110 transition-transform"
+                >
+                  <PlusCircle className="w-4 h-4 text-black" />
+                </button>
+              )}
+              {followedUsers.includes(video.uploaderUid) && (
+                 <div className="absolute -bottom-2 bg-secondary rounded-full p-0.5 border-2 border-black">
+                   <Check className="w-3 h-3 text-black" />
+                 </div>
+              )}
             </div>
 
+            {/* Like */}
             <div 
               onClick={() => handleLike(video.$id, video.likesCount || 0)}
               className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
@@ -241,22 +317,40 @@ export function VideoFeed() {
               </span>
             </div>
 
-            <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
+            {/* Comment */}
+            <div 
+              onClick={() => setSelectedVideoForComments(video.$id)}
+              className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
+            >
               <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
                 <MessageCircle className="w-7 h-7 text-white" />
               </div>
-              <span className="text-[10px] font-bold text-white drop-shadow-md">{video.commentsCount || 0}</span>
+              <span className="text-[10px] font-bold text-white drop-shadow-md">
+                {video.commentsCount || 0}
+              </span>
             </div>
 
-            <div className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90">
+            {/* Share */}
+            <div 
+              onClick={() => handleShare(video)}
+              className="flex flex-col items-center gap-1 group cursor-pointer pointer-events-auto transition-transform active:scale-90"
+            >
               <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 group-hover:bg-white/20 transition-colors">
                 <Forward className="w-7 h-7 text-white" />
               </div>
-              <span className="text-[10px] font-bold text-white drop-shadow-md">{video.sharesCount || 'Share'}</span>
+              <span className="text-[10px] font-bold text-white drop-shadow-md">
+                {video.sharesCount || 0}
+              </span>
             </div>
           </div>
         </section>
       ))}
+
+      <CommentsModal 
+        isOpen={!!selectedVideoForComments}
+        onClose={() => setSelectedVideoForComments(null)}
+        videoId={selectedVideoForComments || ''}
+      />
     </div>
   );
 }
