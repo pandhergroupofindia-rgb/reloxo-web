@@ -62,16 +62,14 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
     setUploadStatus('uploading');
 
     try {
-      // 1. Get YT Token
       const tokenRes = await fetch('/api/yt-token');
       const { access_token, error } = await tokenRes.json();
       if (error) throw new Error(error);
 
-      // 2. Prepare YT Multipart
       const metadata = {
         snippet: {
-          title: title || `Reloxo Vibe - ${new Date().toLocaleDateString()}`,
-          description: `${caption}\n\n#reloxo #vibe #${category.toLowerCase()}`,
+          title: title || `Relox Vibe - ${new Date().toLocaleDateString()}`,
+          description: `${caption}\n\n#relox #vibe #${category.toLowerCase()}`,
           categoryId: '22',
         },
         status: {
@@ -83,7 +81,6 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
       formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       formData.append('video', file);
 
-      // 3. Axios Upload with Progress
       const ytResponse = await axios.post(
         'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart&part=snippet,status',
         formData,
@@ -102,7 +99,6 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
 
       const videoId = ytResponse.data.id;
 
-      // 4. Save to Appwrite
       await databases.createDocument(
         DATABASE_ID,
         VIDEOS_COLLECTION_ID,
@@ -184,7 +180,7 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
                 <Textarea 
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Tell your story... #trending #reloxo"
+                  placeholder="Tell your story... #trending #relox"
                   className="bg-white/5 border-white/10 rounded-xl min-h-[100px] focus-visible:ring-primary focus-visible:border-primary resize-none text-white"
                   disabled={isUploading}
                 />
@@ -243,7 +239,7 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-2xl font-headline font-bold text-white neon-text">
-                    {uploadStatus === 'uploading' ? 'Publishing Vibe...' : 'Finalizing...'}
+                    Publishing Vibe... 🚀
                   </h3>
                   <p className="text-muted-foreground text-xs uppercase tracking-widest font-medium">
                     {uploadStatus === 'uploading' ? `Sending Data: ${uploadProgress}%` : 'Processing for High Quality'}

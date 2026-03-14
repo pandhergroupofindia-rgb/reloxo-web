@@ -7,7 +7,7 @@ import { OnboardingModal } from '@/components/OnboardingModal';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'Reloxo - Short Video Discovery',
+  title: 'Relox - Short Video Discovery',
   description: 'A futuristic dark neon short video experience.',
 };
 

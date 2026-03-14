@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Grid, Heart, Bookmark, LogOut, Settings, Play } from 'lucide-react';
+import { Grid, Heart, Bookmark, LogOut, Settings, Play, X, Shield, FileText, ChevronRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { databases, DATABASE_ID, Query } from '@/lib/appwrite';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 const VIDEOS_COLLECTION_ID = 'videos';
 
@@ -15,6 +17,7 @@ export default function ProfilePage() {
   const { user, logout, loading } = useAuth();
   const [userVideos, setUserVideos] = useState<any[]>([]);
   const [fetchingVideos, setFetchingVideos] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     if (user?.$id || user?.uid) {
@@ -64,13 +67,13 @@ export default function ProfilePage() {
         <div className="relative group">
           <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/40 transition-all" />
           <Avatar className="w-28 h-28 border-4 border-black ring-2 ring-primary relative z-10 shadow-[0_0_20px_rgba(51,240,255,0.3)]">
-            <AvatarImage src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'U')}&background=33F0FF&color=000`} alt={user.name} />
+            <AvatarImage src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || user.displayName || 'U')}&background=33F0FF&color=000`} alt={user.name} />
             <AvatarFallback className="bg-zinc-900 text-2xl font-bold">{user.name?.charAt(0) || 'U'}</AvatarFallback>
           </Avatar>
         </div>
         
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-headline font-bold neon-text">{user.name || user.displayName}</h1>
+          <h1 className="text-2xl font-headline font-bold neon-text">{user.displayName || user.name}</h1>
           <p className="text-primary text-sm font-bold tracking-widest">{user.username || '@viber'}</p>
           <p className="text-muted-foreground text-xs max-w-[250px] mt-2 line-clamp-2 italic">
             {user.bio || 'Setting the stage for the next big vibe. ⚡'}
@@ -100,9 +103,58 @@ export default function ProfilePage() {
           <Button variant="outline" className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px]">
             Edit Vibe
           </Button>
-          <Button variant="outline" size="icon" className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl w-12 h-12" onClick={logout}>
-            <LogOut className="w-4 h-4 text-destructive" />
-          </Button>
+          
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="border-white/10 bg-white/5 hover:bg-white/10 rounded-xl w-12 h-12">
+                <Settings className="w-4 h-4 text-white" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="bg-[#111] border-t border-white/10 rounded-t-[2.5rem] p-8 pb-12 outline-none">
+              <SheetHeader className="mb-6">
+                <SheetTitle className="text-xl font-headline font-bold text-white neon-text text-left">Settings</SheetTitle>
+              </SheetHeader>
+              <div className="space-y-2">
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-between h-14 text-white hover:bg-white/5 rounded-2xl px-4"
+                  onClick={() => router.push('/privacy')}
+                >
+                  <div className="flex items-center gap-3">
+                    <Shield className="w-5 h-5 text-primary" />
+                    <span className="font-medium">Privacy Policy</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </Button>
+                
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-between h-14 text-white hover:bg-white/5 rounded-2xl px-4"
+                  onClick={() => router.push('/terms')}
+                >
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-primary" />
+                    <span className="font-medium">Terms of Service</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </Button>
+                
+                <div className="h-px bg-white/5 my-2" />
+                
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-between h-14 text-destructive hover:bg-destructive/10 rounded-2xl px-4"
+                  onClick={logout}
+                >
+                  <div className="flex items-center gap-3">
+                    <LogOut className="w-5 h-5" />
+                    <span className="font-medium">Logout</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 opacity-50" />
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
 
