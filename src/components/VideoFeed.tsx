@@ -5,7 +5,7 @@ import YouTube from "react-youtube";
 import { Heart, MessageCircle, Forward, PlusCircle, Search, MoreVertical, Trash2, AlertTriangle, Play, Pause } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
-import { databases, DATABASE_ID, Query, COLLECTION_ID } from "@/lib/appwrite";
+import { databases, DATABASE_ID, Query } from "@/lib/appwrite";
 import { ID } from "appwrite";
 import { CommentsModal } from "./CommentsModal";
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +37,6 @@ export function VideoFeed() {
   
   const playerRefs = useRef<Record<string, any>>({});
   const lastTap = useRef<number>(0);
-  const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -101,7 +100,7 @@ export function VideoFeed() {
       
     } catch (err: any) {
       console.error('Error fetching videos:', err);
-      setError(err.message || 'Failed to sync vibes.');
+      setError('Failed to sync vibes.');
     } finally {
       setLoading(false);
     }
@@ -110,7 +109,7 @@ export function VideoFeed() {
   const fetchUserProfile = async (uid: string) => {
     if (userProfiles[uid]) return;
     try {
-      const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, uid);
+      const doc = await databases.getDocument(DATABASE_ID, 'users', uid);
       const profile = JSON.parse(doc.profileData || '{}');
       setUserProfiles(prev => ({ ...prev, [uid]: profile }));
     } catch (e) { }
@@ -342,7 +341,7 @@ export function VideoFeed() {
   }
 
   return (
-    <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar relative" ref={feedRef}>
+    <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar relative">
       <div className="fixed top-0 left-0 w-full z-[100] p-4 flex items-center justify-between bg-black/80 backdrop-blur-md border-b border-white/5 shadow-lg">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-headline font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">

@@ -4,14 +4,13 @@ import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Grid, Heart, Bookmark, LogOut, Settings, Play, Shield, FileText, ChevronRight, MessageSquare, CheckCircle2, Loader2, Coins, Wallet, ArrowLeft } from 'lucide-react';
+import { Grid, Heart, Bookmark, LogOut, Settings, Play, Shield, FileText, ChevronRight, MessageSquare, CheckCircle2, Loader2, Coins, LayoutDashboard, ArrowLeft } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { databases, DATABASE_ID, Query, COLLECTION_ID } from '@/lib/appwrite';
+import { databases, DATABASE_ID, Query } from '@/lib/appwrite';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Progress } from '@/components/ui/progress';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -26,7 +25,6 @@ function ProfileContent() {
   const [userVideos, setUserVideos] = useState<any[]>([]);
   const [fetchingVideos, setFetchingVideos] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [isCreatorToolsOpen, setIsCreatorToolsOpen] = useState(false);
   const [editData, setEditData] = useState({ name: '', bio: '' });
   const [isUpdating, setIsUpdating] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
@@ -49,7 +47,7 @@ function ProfileContent() {
     const fetchTargetProfile = async () => {
       if (!viewingOtherUserId) return;
       try {
-        const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, viewingOtherUserId);
+        const doc = await databases.getDocument(DATABASE_ID, 'users', viewingOtherUserId);
         const profile = JSON.parse(doc.profileData || '{}');
         setTargetUser({ ...doc, ...profile });
       } catch (e) {
@@ -61,7 +59,7 @@ function ProfileContent() {
   }, [viewingOtherUserId]);
 
   useEffect(() => {
-    const targetId = viewingOtherUserId || user?.$id || user?.uid;
+    const targetId = viewingOtherUserId || user?.$id;
     if (targetId) {
       fetchUserVideos(targetId);
       fetchFollowCounts(targetId);
@@ -113,7 +111,7 @@ function ProfileContent() {
     if (!user?.$id) return;
     setIsUpdating(true);
     try {
-      const currentProfileDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, user.$id);
+      const currentProfileDoc = await databases.getDocument(DATABASE_ID, 'users', user.$id);
       const currentProfile = JSON.parse(currentProfileDoc.profileData || '{}');
       
       const updatedProfile = {
@@ -122,7 +120,7 @@ function ProfileContent() {
         bio: editData.bio
       };
 
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID, user.$id, {
+      await databases.updateDocument(DATABASE_ID, 'users', user.$id, {
         profileData: JSON.stringify(updatedProfile)
       });
 
@@ -145,8 +143,8 @@ function ProfileContent() {
     );
   }
 
-  const isOwnProfile = !viewingOtherUserId || viewingOtherUserId === (user?.$id || user?.uid);
-  const walletProgress = Math.min(100, ((targetUser?.walletBalance || 0) / 8000) * 100);
+  const isOwnProfile = !viewingOtherUserId || viewingOtherUserId === user?.$id;
+  const totalLikes = userVideos.reduce((acc, v) => acc + (v.likesCount || 0), 0);
 
   return (
     <div className="flex flex-col h-full bg-black text-white overflow-y-auto hide-scrollbar pb-24">
@@ -189,10 +187,38 @@ function ProfileContent() {
             <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold">Followers</p>
           </div>
           <div className="text-center">
-            <p className="font-bold text-xl">{userVideos.reduce((acc, v) => acc + (v.likesCount || 0), 0)}</p>
+            <p className="font-bold text-xl">{totalLikes}</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold">Likes</p>
           </div>
         </div>
+
+        {isOwnProfile && (
+          <div className="w-full px-4 mb-4">
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex flex-col gap-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <LayoutDashboard className="w-5 h-5 text-primary" />
+                  <span className="font-headline font-bold text-sm">Professional Dashboard</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-white">{totalLikes * 12}</span>
+                  <span className="text-[8px] text-muted-foreground uppercase font-bold">Reached</span>
+                </div>
+                <div className="flex flex-col border-x border-white/10 px-2">
+                  <span className="text-xs font-bold text-white">{totalLikes * 3}</span>
+                  <span className="text-[8px] text-muted-foreground uppercase font-bold">Visits</span>
+                </div>
+                <div className="flex flex-col pl-2">
+                  <span className="text-xs font-bold text-white">{totalLikes}</span>
+                  <span className="text-[8px] text-muted-foreground uppercase font-bold">Engaged</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3 w-full px-4">
           {isOwnProfile ? (
@@ -221,47 +247,14 @@ function ProfileContent() {
                 </DialogContent>
               </Dialog>
 
-              <Dialog open={isCreatorToolsOpen} onOpenChange={setIsCreatorToolsOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="flex-1 border-primary/30 bg-primary/5 hover:bg-primary/10 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px] flex items-center gap-2">
-                    <Coins className="w-3 h-3 text-primary" />
-                    Creator Tools
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-zinc-900 border-white/10 text-white rounded-[2.5rem]">
-                  <DialogHeader>
-                    <DialogTitle className="neon-text flex items-center gap-2">
-                      <Wallet className="w-5 h-5" />
-                      Creator Tools
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="py-8 text-center space-y-6">
-                    <div className="p-6 bg-black/40 rounded-3xl border border-white/5 space-y-4">
-                      <div className="flex justify-between items-end">
-                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Wallet Balance</p>
-                        <span className="text-primary font-bold text-xs">₹8000 goal</span>
-                      </div>
-                      <h3 className="text-4xl font-headline font-bold text-white text-left">₹{targetUser?.walletBalance || 0}</h3>
-                      <Progress value={walletProgress} className="h-2 bg-white/10" />
-                    </div>
-                    
-                    <Button 
-                      className={cn(
-                        "w-full h-14 rounded-2xl font-bold uppercase tracking-widest transition-all",
-                        (targetUser?.walletBalance || 0) >= 8000 
-                          ? "bg-primary text-black shadow-[0_0_20px_rgba(51,240,255,0.4)] animate-pulse" 
-                          : "bg-white/5 text-white/20 cursor-not-allowed"
-                      )}
-                      disabled={(targetUser?.walletBalance || 0) < 8000}
-                    >
-                      Withdraw ₹8000
-                    </Button>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest leading-relaxed">
-                      Minimum withdrawal threshold is ₹8000. Keep creating vibes!
-                    </p>
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <Button 
+                onClick={() => router.push('/monetization')}
+                variant="outline" 
+                className="flex-1 border-primary/30 bg-primary/5 hover:bg-primary/10 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px] flex items-center gap-2"
+              >
+                <Coins className="w-3 h-3 text-primary" />
+                Monetization
+              </Button>
               
               <Sheet>
                 <SheetTrigger asChild>
@@ -294,7 +287,7 @@ function ProfileContent() {
           ) : (
             <>
               <Button className="flex-1 bg-primary text-black hover:bg-primary/90 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px]">Follow</Button>
-              <Button variant="outline" className="flex-1 border-white/10 bg-white/5 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px] flex items-center gap-2" onClick={() => alert("Redirecting to chat...")}>
+              <Button variant="outline" className="flex-1 border-white/10 bg-white/5 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px] flex items-center gap-2" onClick={() => router.push(`/chat/${targetUser?.$id}`)}>
                 <MessageSquare className="w-3 h-3" /> Message
               </Button>
             </>
@@ -317,7 +310,7 @@ function ProfileContent() {
               {userVideos.map((video) => (
                 <div key={video?.$id} className="relative aspect-[3/4] bg-zinc-900 overflow-hidden group cursor-pointer" onClick={() => router.push(`/?v=${video?.youtubeId}`)}>
                   <img 
-                    src={video?.thumbnailUrl || `https://i.ytimg.com/vi/${video?.youtubeId}/0.jpg`}
+                    src={video?.thumbnailUrl || `https://i.ytimg.com/vi/${video?.youtubeId}/hqdefault.jpg`}
                     alt={video?.title || "Vibe"}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     loading="lazy"

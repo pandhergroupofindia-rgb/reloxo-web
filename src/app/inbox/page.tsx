@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Bell, Search, CheckCircle2, User, Send } from 'lucide-react';
+import { Bell, Search, CheckCircle2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
 import { databases, DATABASE_ID, Query } from '@/lib/appwrite';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 const CHATS_COLLECTION_ID = 'chats';
 
@@ -15,6 +15,7 @@ export default function InboxPage() {
   const { user } = useAuth();
   const [chats, setChats] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     if (user) {
@@ -24,20 +25,31 @@ export default function InboxPage() {
 
   const fetchChats = async () => {
     try {
-      // In a real app, we'd fetch from Appwrite 'chats' table
-      // const response = await databases.listDocuments(DATABASE_ID, CHATS_COLLECTION_ID, [
-      //   Query.or([Query.equal('senderId', user.$id), Query.equal('receiverId', user.$id)]),
-      //   Query.orderDesc('$createdAt')
-      // ]);
-      // setChats(response.documents);
+      const response = await databases.listDocuments(DATABASE_ID, CHATS_COLLECTION_ID, [
+        Query.or([Query.equal('senderId', user.$id), Query.equal('receiverId', user.$id)]),
+        Query.orderDesc('$createdAt'),
+        Query.limit(50)
+      ]);
       
-      // Mocking empty state to trigger bot logic as requested
-      setChats([]);
+      // Group by unique user interactions
+      const groupedChats: Record<string, any> = {};
+      response.documents.forEach((doc: any) => {
+        const otherId = doc.senderId === user.$id ? doc.receiverId : doc.senderId;
+        if (!groupedChats[otherId]) {
+          groupedChats[otherId] = doc;
+        }
+      });
+
+      setChats(Object.values(groupedChats));
     } catch (error) {
       console.error('Error fetching chats:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const navigateToChat = (id: string) => {
+    router.push(`/chat/${id}`);
   };
 
   return (
@@ -69,10 +81,13 @@ export default function InboxPage() {
               <div className="p-12 flex justify-center">
                 <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
               </div>
-            ) : chats.length === 0 ? (
-              <div className="p-2">
-                {/* Relox Official Bot Message */}
-                <div className="flex items-center gap-4 p-4 hover:bg-white/5 rounded-2xl transition-all cursor-pointer group">
+            ) : (
+              <div className="p-2 space-y-1">
+                {/* Always show Bot if no real chats or as a fixed entry */}
+                <div 
+                  className="flex items-center gap-4 p-4 hover:bg-white/5 rounded-2xl transition-all cursor-pointer group"
+                  onClick={() => navigateToChat('relox_bot')}
+                >
                   <div className="relative">
                     <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-400 to-blue-600 p-0.5 shadow-[0_0_15px_rgba(34,211,238,0.25)]">
                       <div className="bg-black w-full h-full rounded-full flex items-center justify-center overflow-hidden">
@@ -96,24 +111,29 @@ export default function InboxPage() {
                     </p>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="p-2 space-y-1">
-                {chats.map((chat) => (
-                  <div key={chat.$id} className="flex items-center gap-4 p-4 hover:bg-white/5 rounded-2xl transition-all cursor-pointer">
-                    <Avatar className="w-14 h-14 border border-white/10">
-                      <AvatarImage src={chat.userPhoto} />
-                      <AvatarFallback className="bg-zinc-900">{chat.username[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm">{chat.username}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase">2h ago</span>
+
+                {chats.filter(c => c.senderId !== 'relox_bot' && c.receiverId !== 'relox_bot').map((chat) => {
+                  const otherId = chat.senderId === user.$id ? chat.receiverId : chat.senderId;
+                  return (
+                    <div 
+                      key={chat.$id} 
+                      className="flex items-center gap-4 p-4 hover:bg-white/5 rounded-2xl transition-all cursor-pointer"
+                      onClick={() => navigateToChat(otherId)}
+                    >
+                      <Avatar className="w-14 h-14 border border-white/10">
+                        <AvatarImage src={`https://ui-avatars.com/api/?name=${otherId}&background=33F0FF&color=000`} />
+                        <AvatarFallback className="bg-zinc-900">{otherId[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-sm">@{otherId.slice(0, 8)}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase">2h ago</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-1">{chat.text}</p>
                       </div>
-                      <p className="text-xs text-muted-foreground line-clamp-1">{chat.lastMessage}</p>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </ScrollArea>
