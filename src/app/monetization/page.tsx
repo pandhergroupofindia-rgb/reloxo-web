@@ -51,12 +51,11 @@ export default function MonetizationPage() {
             </div>
 
             <Button 
-              className={cn(
-                "w-full h-14 rounded-2xl font-bold uppercase tracking-widest transition-all",
+              className={`w-full h-14 rounded-2xl font-bold uppercase tracking-widest transition-all ${
                 balance >= goal 
                   ? "bg-primary text-black shadow-[0_0_30px_rgba(51,240,255,0.4)] animate-pulse" 
                   : "bg-white/5 text-white/30 cursor-not-allowed"
-              )}
+              }`}
               disabled={balance < goal}
             >
               {balance >= goal ? "Withdraw Funds 🚀" : "Keep Vibe-ing to Withdraw"}
@@ -89,7 +88,9 @@ export default function MonetizationPage() {
         </section>
 
         <section className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex gap-4">
-          <Info className="w-6 h-6 text-primary shrink-0" />
+          <div className="shrink-0 pt-1">
+            <Info className="w-6 h-6 text-primary" />
+          </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Payouts are processed within 3-5 business days after withdrawal. Minimum payout threshold is strictly ₹8000 for standard accounts.
           </p>
