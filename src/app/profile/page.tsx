@@ -4,22 +4,24 @@ import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Grid, Heart, Bookmark, LogOut, Settings, Play, Shield, FileText, ChevronRight, MessageSquare, CheckCircle2, Loader2, Coins, LayoutDashboard, ArrowLeft, TrendingUp } from 'lucide-react';
+import { Grid, Heart, Bookmark, LogOut, Settings, Play, Shield, FileText, ChevronRight, MessageSquare, CheckCircle2, Loader2, Coins, LayoutDashboard, TrendingUp, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { databases, DATABASE_ID, Query } from '@/lib/appwrite';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ID } from 'appwrite';
 import Link from 'next/link';
 
 const VIDEOS_COLLECTION_ID = 'videos';
 const FOLLOWERS_COLLECTION_ID = 'followers';
 
 function ProfileContent() {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading, openLoginModal } = useAuth();
   const { toast } = useToast();
   const [targetUser, setTargetUser] = useState<any>(null);
   const [userVideos, setUserVideos] = useState<any[]>([]);
@@ -29,6 +31,12 @@ function ProfileContent() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [showListModal, setShowListModal] = useState<'followers' | 'following' | null>(null);
+  const [userList, setUserList] = useState<any[]>([]);
+  const [fetchingList, setFetchingList] = useState(false);
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const viewingOtherUserId = searchParams.get('id');
@@ -49,8 +57,10 @@ function ProfileContent() {
       try {
         const doc = await databases.getDocument(DATABASE_ID, 'users', viewingOtherUserId);
         const profile = JSON.parse(doc.profileData || '{}');
-        setTargetUser({ ...doc, ...profile });
-      } catch (e) {}
+        setTargetUser({ ...doc, ...profile, $id: viewingOtherUserId });
+      } catch (e) {
+        console.error("Error fetching target profile:", e);
+      }
     };
     fetchTargetProfile();
   }, [viewingOtherUserId]);
@@ -60,10 +70,23 @@ function ProfileContent() {
     if (targetId) {
       fetchUserVideos(targetId);
       fetchFollowCounts(targetId);
+      if (viewingOtherUserId && user) {
+        checkFollowStatus(user.$id, viewingOtherUserId);
+      }
     } else if (!loading && !viewingOtherUserId) {
       setFetchingVideos(false);
     }
   }, [user, viewingOtherUserId, loading]);
+
+  const checkFollowStatus = async (followerId: string, followingId: string) => {
+    try {
+      const response = await databases.listDocuments(DATABASE_ID, FOLLOWERS_COLLECTION_ID, [
+        Query.equal('followerId', followerId),
+        Query.equal('followingId', followingId)
+      ]);
+      setIsFollowing(response.total > 0);
+    } catch (error) {}
+  };
 
   const fetchFollowCounts = async (targetId: string) => {
     try {
@@ -72,6 +95,77 @@ function ProfileContent() {
       const following = await databases.listDocuments(DATABASE_ID, FOLLOWERS_COLLECTION_ID, [Query.equal('followerId', targetId)]);
       setFollowingCount(following.total);
     } catch (error) {}
+  };
+
+  const handleFollowToggle = async () => {
+    if (!user) {
+      openLoginModal();
+      return;
+    }
+    if (!viewingOtherUserId || followLoading) return;
+
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        const response = await databases.listDocuments(DATABASE_ID, FOLLOWERS_COLLECTION_ID, [
+          Query.equal('followerId', user.$id),
+          Query.equal('followingId', viewingOtherUserId)
+        ]);
+        if (response.total > 0) {
+          await databases.deleteDocument(DATABASE_ID, FOLLOWERS_COLLECTION_ID, response.documents[0].$id);
+          setIsFollowing(false);
+          setFollowersCount(prev => Math.max(0, prev - 1));
+          toast({ title: "Unfollowed" });
+        }
+      } else {
+        await databases.createDocument(DATABASE_ID, FOLLOWERS_COLLECTION_ID, ID.unique(), {
+          followerId: user.$id,
+          followingId: viewingOtherUserId
+        });
+        setIsFollowing(true);
+        setFollowersCount(prev => prev + 1);
+        toast({ title: "Followed! ⚡" });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: "Action failed" });
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const fetchUserList = async (type: 'followers' | 'following') => {
+    const targetId = viewingOtherUserId || user?.$id;
+    if (!targetId) return;
+
+    setFetchingList(true);
+    setShowListModal(type);
+    setUserList([]);
+
+    try {
+      const field = type === 'followers' ? 'followingId' : 'followerId';
+      const response = await databases.listDocuments(DATABASE_ID, FOLLOWERS_COLLECTION_ID, [
+        Query.equal(field, targetId),
+        Query.limit(50)
+      ]);
+
+      const otherField = type === 'followers' ? 'followerId' : 'followingId';
+      const uids = response.documents.map((doc: any) => doc[otherField]);
+      
+      if (uids.length > 0) {
+        const userDocs = await databases.listDocuments(DATABASE_ID, 'users', [
+          Query.equal('$id', uids)
+        ]);
+        const formattedUsers = userDocs.documents.map((doc: any) => {
+          const profile = JSON.parse(doc.profileData || '{}');
+          return { ...doc, ...profile };
+        });
+        setUserList(formattedUsers);
+      }
+    } catch (error) {
+      console.error("Error fetching list:", error);
+    } finally {
+      setFetchingList(false);
+    }
   };
 
   const fetchUserVideos = async (targetId: string) => {
@@ -137,11 +231,11 @@ function ProfileContent() {
         </div>
 
         <div className="flex gap-10 py-4 w-full justify-center">
-          <div className="text-center">
+          <div className="text-center cursor-pointer active:scale-95 transition-transform" onClick={() => fetchUserList('following')}>
             <p className="font-bold text-xl">{followingCount}</p>
             <p className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold">Following</p>
           </div>
-          <div className="text-center border-x border-white/10 px-10">
+          <div className="text-center border-x border-white/10 px-10 cursor-pointer active:scale-95 transition-transform" onClick={() => fetchUserList('followers')}>
             <p className="font-bold text-xl">{followersCount}</p>
             <p className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold">Followers</p>
           </div>
@@ -243,7 +337,15 @@ function ProfileContent() {
             </>
           ) : (
             <>
-              <Button className="flex-1 bg-primary text-black hover:bg-primary/90 rounded-xl h-12 font-bold text-[10px] uppercase">Follow</Button>
+              <Button 
+                onClick={handleFollowToggle}
+                disabled={followLoading}
+                className={`flex-1 rounded-xl h-12 font-bold text-[10px] uppercase transition-all ${
+                  isFollowing ? 'bg-zinc-800 text-white border border-white/5' : 'bg-primary text-black hover:bg-primary/90'
+                }`}
+              >
+                {followLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : isFollowing ? 'Following' : 'Follow'}
+              </Button>
               <Button variant="outline" className="flex-1 border-white/10 bg-white/5 rounded-xl h-12 font-bold text-[10px] uppercase flex items-center gap-2" onClick={() => router.push(`/chat/${targetUser?.$id}`)}>
                 <MessageSquare className="w-3 h-3" /> Message
               </Button>
@@ -284,6 +386,50 @@ function ProfileContent() {
         <TabsContent value="liked" className="p-20 text-center opacity-20 flex flex-col items-center gap-4"><Heart className="w-8 h-8" /><p className="text-[10px] font-bold uppercase tracking-widest">No Liked Vibes</p></TabsContent>
         <TabsContent value="saved" className="p-20 text-center opacity-20 flex flex-col items-center gap-4"><Bookmark className="w-8 h-8" /><p className="text-[10px] font-bold uppercase tracking-widest">No Saved Vibes</p></TabsContent>
       </Tabs>
+
+      {/* Followers/Following List Modal */}
+      <Dialog open={!!showListModal} onOpenChange={(open) => !open && setShowListModal(null)}>
+        <DialogContent className="bg-black border-white/10 p-0 max-w-sm rounded-[2rem] overflow-hidden flex flex-col h-[70vh]">
+          <div className="p-6 border-b border-white/5 flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-widest neon-text">
+              {showListModal === 'followers' ? 'Followers' : 'Following'}
+            </h2>
+            <DialogClose className="p-2 rounded-full hover:bg-white/5">
+              <X className="w-4 h-4 text-white" />
+            </DialogClose>
+          </div>
+          <ScrollArea className="flex-1 p-4">
+            {fetchingList ? (
+              <div className="p-12 flex justify-center"><Loader2 className="w-6 h-6 text-primary animate-spin" /></div>
+            ) : userList.length > 0 ? (
+              <div className="space-y-4">
+                {userList.map((listUser) => (
+                  <div key={listUser.$id} className="flex items-center justify-between group">
+                    <Link href={`/profile?id=${listUser.$id}`} className="flex items-center gap-3" onClick={() => setShowListModal(null)}>
+                      <Avatar className="w-10 h-10 border border-white/5">
+                        <AvatarImage src={listUser.photoURL} />
+                        <AvatarFallback>{listUser.name?.[0]}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="text-xs font-bold">{listUser.displayName || listUser.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{listUser.username}</p>
+                      </div>
+                    </Link>
+                    <Button size="sm" variant="outline" className="h-8 rounded-full border-white/10 hover:bg-primary hover:text-black transition-colors" onClick={() => router.push(`/chat/${listUser.$id}`)}>
+                      <MessageSquare className="w-3 h-3 mr-1" /> Message
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-20 text-center opacity-30 flex flex-col items-center gap-4">
+                <Grid className="w-8 h-8" />
+                <p className="text-[10px] font-bold uppercase tracking-widest">No users found</p>
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
