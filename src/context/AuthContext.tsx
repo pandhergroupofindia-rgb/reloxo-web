@@ -31,24 +31,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const checkSession = async () => {
+    setLoading(true);
     try {
       const currentAccount = await account.get();
       if (currentAccount) {
         try {
+          // Fetch the user's profile document
           const profileDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, currentAccount.$id);
-          const profile = JSON.parse(profileDoc.profileData || '{}');
-          setUser({ ...currentAccount, ...profile });
+          
+          // CRITICAL: Parse profileData JSON string
+          let profile = {};
+          try {
+            profile = JSON.parse(profileDoc.profileData || '{}');
+          } catch (e) {
+            console.error("Failed to parse profileData JSON", e);
+          }
+          
+          setUser({ ...currentAccount, ...profile, $id: currentAccount.$id });
         } catch (e: any) {
-          // No profile yet, trigger onboarding
-          setTempUser(currentAccount);
-          setIsOnboardingOpen(true);
+          // Document doesn't exist (Status 404), trigger onboarding
+          if (e.code === 404) {
+            setTempUser(currentAccount);
+            setIsOnboardingOpen(true);
+          } else {
+            console.error("Error fetching user profile:", e);
+          }
         }
       }
     } catch (error: any) {
-      if (error.message?.includes('fetch') || error.name === 'TypeError') {
-        const hostname = typeof window !== 'undefined' ? window.location.hostname : 'your domain';
-        console.warn(`Appwrite connection failed. Make sure "${hostname}" is added as a Web Platform in Appwrite.`);
-      }
+      // User is not logged in (Status 401)
       setUser(null);
     } finally {
       setLoading(false);
@@ -63,13 +74,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         window.location.origin
       );
     } catch (error: any) {
-      console.error('Login Error:', error.message);
+      console.error('OAuth Error:', error.message);
     }
   };
 
   const completeOnboarding = async (username: string, bio: string) => {
     if (!tempUser) return;
     try {
+      // Build the JSON object for profileData
       const profile = {
         uid: tempUser.$id,
         email: tempUser.email,
@@ -78,10 +90,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         bio: bio || '',
         walletBalance: 0,
         isVerified: false,
+        isMonetized: false,
         role: 'user',
         photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(tempUser.name)}&background=33F0FF&color=000`,
       };
 
+      // Create the document in Appwrite
       await databases.createDocument(
         DATABASE_ID,
         COLLECTION_ID,
@@ -89,11 +103,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         { profileData: JSON.stringify(profile) }
       );
 
-      setUser({ ...tempUser, ...profile });
+      setUser({ ...tempUser, ...profile, $id: tempUser.$id });
       setIsOnboardingOpen(false);
       setTempUser(null);
     } catch (error: any) {
-      console.error('Onboarding Error:', error.message);
+      console.error('Onboarding Submission Error:', error.message);
+      throw error;
     }
   };
 
